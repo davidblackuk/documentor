@@ -51,15 +51,12 @@ The path above matches the hardcoded `DEEPSEEK_PATH` in `documenter.py`. If you 
 
 ## Configure paths
 
-`start.sh` and `documenter.py` contain hardcoded absolute paths for the venv and model. Update them to match your setup:
-
-- **`start.sh`** — change the `source` line and the `python` invocation to point to wherever you cloned the repo.
-- **`documenter.py` line 34** — change `DEEPSEEK_PATH` if you stored the model weights in a different location.
+`documenter.py` contains a hardcoded path for the model weights. If you store them in a different location, update `DEEPSEEK_PATH` near the top of the file.
 
 ## Run
 
 ```bash
-# Using the launcher script (after updating paths in start.sh):
+# Using the launcher script:
 ./start.sh
 
 # Or directly, with the venv active:
