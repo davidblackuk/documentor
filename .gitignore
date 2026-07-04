@@ -2,9 +2,12 @@
 bin/
 include/
 lib/
-lib64/
+lib64
 share/
 pyvenv.cfg
+
+# Claude Code session data
+.claude/
 
 # Pipeline I/O — large PDFs, images, and generated markdown
 input/
