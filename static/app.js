@@ -863,11 +863,24 @@ class EditorView {
     this._pdfPane     = new PdfViewerPane(this._pdfBody, this._pdfIndicator);
     this._scroller    = null;   // created after Monaco is ready
 
-    this._dirty        = false;
-    this._monacoReady  = false;
-    this._splitInstance = null;
+    this._dirty          = false;
+    this._monacoReady    = false;
+    this._splitInstance  = null;
+    this._savePageTimer  = null;
 
     this._wireToolbar();
+  }
+
+  // ── Last-position persistence (localStorage) ──────────────────────────────
+
+  _saveLastPage(page) {
+    if (this._stem && page) {
+      localStorage.setItem(`documenter.page.${this._stem}`, page);
+    }
+  }
+
+  _loadLastPage(stem) {
+    return parseInt(localStorage.getItem(`documenter.page.${stem}`), 10) || 1;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -902,6 +915,17 @@ class EditorView {
 
     // Render initial preview
     this._previewPane.update(markdown, stem);
+
+    // Restore the last scroll position for this document.  The small delay
+    // lets the PDF container finish its initial layout before we set scrollTop.
+    const lastPage = this._loadLastPage(stem);
+    if (lastPage > 1) {
+      setTimeout(() => {
+        this._pdfPane.setPage(lastPage);
+        this._editorPane.setPage(lastPage);
+        this._previewPane.setPage(lastPage);
+      }, 300);
+    }
   }
 
   // ── Split.js — resizable pane dividers ────────────────────────────────────
@@ -946,6 +970,16 @@ class EditorView {
       this._dirty = true;
       this._setSaveStatus("Unsaved", "dirty");
       this._previewPane.update(this._editorPane.getValue());
+    });
+
+    // Persist the current page to localStorage 500 ms after scrolling stops.
+    // The PDF pane is used as the single source of truth (sync scroll keeps
+    // all three panes aligned, so any pane would give the same page number).
+    this._pdfPane.onScroll(() => {
+      clearTimeout(this._savePageTimer);
+      this._savePageTimer = setTimeout(() => {
+        this._saveLastPage(this._pdfPane.getVisiblePage());
+      }, 500);
     });
   }
 
