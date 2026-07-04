@@ -707,14 +707,19 @@ class PreviewPane {
     // marked.js is loaded globally from the CDN script tag in index.html.
     this._body.innerHTML = marked.parse(processed, { breaks: false });
 
+    // Syntax-highlight every fenced code block.  hljs.highlightElement() is
+    // idempotent so re-renders are safe.
+    this._body.querySelectorAll("pre code").forEach(el => hljs.highlightElement(el));
+
     // Rewrite relative image paths to the API endpoint so the browser can
     // find extracted figures stored in output/{stem}/images/.
     if (this._stem) {
+      const base = `/api/pdf/${encodeURIComponent(this._stem)}/images/`;
       this._body.querySelectorAll("img").forEach(img => {
-        const src = img.getAttribute("src");
-        if (src && src.startsWith("images/")) {
-          img.src = `/api/pdf/${encodeURIComponent(this._stem)}/images/${src.slice(7)}`;
-        }
+        const src = img.getAttribute("src") ?? "";
+        // Handle both relative ("images/foo.jpg") and absolute ("/images/foo.jpg") paths.
+        if (src.startsWith("images/"))  img.src = base + src.slice(7);
+        else if (src.startsWith("/images/")) img.src = base + src.slice(8);
       });
     }
   }
