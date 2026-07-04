@@ -599,6 +599,11 @@ class MarkdownEditorPane {
     }]);
   }
 
+  /** Adjust the editor font size without rebuilding the editor instance. */
+  setFontSize(px) {
+    this._editor?.updateOptions({ fontSize: px });
+  }
+
   /**
    * Listen for content changes.  Returns a disposable (call .dispose() to stop).
    */
@@ -841,6 +846,7 @@ class EditorView {
     this._btnSave      = document.getElementById("btn-save");
     this._btnRescan    = document.getElementById("btn-rescan-page");
     this._syncToggle   = document.getElementById("toggle-sync-scroll");
+    this._fontSelect   = document.getElementById("font-size-select");
     this._overlay      = document.getElementById("rescan-overlay");
     this._overlayMsg   = document.getElementById("rescan-message");
 
@@ -952,6 +958,12 @@ class EditorView {
     this._btnSave.addEventListener("click", () => this._save());
 
     this._btnRescan.addEventListener("click", () => this._rescanCurrentPage());
+
+    this._fontSelect.addEventListener("change", () => {
+      const px = parseInt(this._fontSelect.value, 10);
+      this._editorPane.setFontSize(px);
+      this._previewBody.style.fontSize = `${px}px`;
+    });
 
     // Ctrl+S / Cmd+S to save
     document.addEventListener("keydown", (e) => {

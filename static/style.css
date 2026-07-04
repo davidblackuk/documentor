@@ -288,6 +288,20 @@ html, body {
   user-select: none;
 }
 
+.font-size-select {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  padding: 2px 4px;
+  cursor: pointer;
+  outline: none;
+}
+
+.font-size-select:hover  { border-color: var(--accent); }
+.font-size-select:focus  { border-color: var(--accent); }
+
 /* ── Editor: three-pane layout ───────────────────────────────────────────── */
 
 .editor-panes {
