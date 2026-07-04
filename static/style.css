@@ -390,25 +390,26 @@ html, body {
 
 .pdf-body {
   background: var(--bg-surface);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  /* block layout: each page wrapper stacks as a normal block element.
+     flex layout caused overflow:hidden flex-items to collapse to 0 height
+     in Chrome regardless of canvas content or aspect-ratio. */
   padding: 12px 8px;
 }
 
 /* Individual PDF page canvas wrappers */
 .pdf-page-wrapper {
   width: 100%;
+  margin-bottom: 8px;    /* replaces flex gap */
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  background: #fff;   /* page background stays white like a real document */
+  background: #fff;
   border-radius: 2px;
   overflow: hidden;
-  line-height: 0;     /* remove gap below inline canvas */
+  line-height: 0;
 }
 
 .pdf-page-wrapper canvas {
   width: 100%;
+  height: 100%;    /* fill the aspect-ratio-sized wrapper exactly */
   display: block;
 }
 

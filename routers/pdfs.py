@@ -78,3 +78,19 @@ def get_page_count(stem: str, svc: PdfService = Depends(get_pdf_service)):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"PDF '{stem}' not found")
     return {"count": count}
+
+
+@router.get("/pdf/{stem}/images/{filename}")
+def get_image(stem: str, filename: str, svc: PdfService = Depends(get_pdf_service)):
+    """
+    Serve an extracted figure image from the document's images/ folder.
+
+    The markdown references images as `images/p0001_0000.jpg`; the preview
+    pane rewrites those to `/api/pdf/{stem}/images/p0001_0000.jpg` so this
+    route resolves them correctly.
+    """
+    import ocr_core
+    path = ocr_core.OUTPUT_DIR / stem / "images" / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Image '{filename}' not found")
+    return FileResponse(str(path))

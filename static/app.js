@@ -476,7 +476,12 @@ class PdfViewerPane {
     canvas.width  = viewport.width;
     canvas.height = viewport.height;
 
-    wrapper.style.minHeight = "";
+    // overflow:hidden on a flex-item wrapper collapses it to 0 height even
+    // when content is present. Setting aspect-ratio gives the wrapper its
+    // correct proportions before the canvas renders, keeping overflow:hidden
+    // (needed for border-radius clipping) without the height collapse.
+    wrapper.style.minHeight  = "";
+    wrapper.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
     wrapper.appendChild(canvas);
 
     await page.render({
@@ -661,6 +666,7 @@ class PreviewPane {
    */
   constructor(bodyEl) {
     this._body         = bodyEl;
+    this._stem         = null;   // set by EditorView so image URLs can be resolved
     this._debounceTimer = null;
   }
 
@@ -670,7 +676,8 @@ class PreviewPane {
    * Schedule a re-render after 150 ms of inactivity.
    * Debouncing prevents the DOM from being replaced on every keypress.
    */
-  update(markdownText) {
+  update(markdownText, stem = null) {
+    if (stem) this._stem = stem;
     clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(() => this._render(markdownText), 150);
   }
@@ -678,6 +685,17 @@ class PreviewPane {
   _render(markdownText) {
     // marked.js is loaded globally from the CDN script tag in index.html.
     this._body.innerHTML = marked.parse(markdownText, { breaks: false });
+
+    // Rewrite relative image paths to the API endpoint so the browser can
+    // find extracted figures stored in output/{stem}/images/.
+    if (this._stem) {
+      this._body.querySelectorAll("img").forEach(img => {
+        const src = img.getAttribute("src");
+        if (src && src.startsWith("images/")) {
+          img.src = `/api/pdf/${encodeURIComponent(this._stem)}/images/${src.slice(7)}`;
+        }
+      });
+    }
   }
 
   // ── Scroll interface (used by SyncScroller) ───────────────────────────────
@@ -839,7 +857,7 @@ class EditorView {
     }
 
     // Render initial preview
-    this._previewPane.update(markdown);
+    this._previewPane.update(markdown, stem);
   }
 
   // ── Split.js — resizable pane dividers ────────────────────────────────────
