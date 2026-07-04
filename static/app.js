@@ -499,15 +499,15 @@ class PdfViewerPane {
 
   // ── Scroll interface (used by SyncScroller) ───────────────────────────────
 
-  getScrollPercent() {
-    const { scrollTop, scrollHeight, clientHeight } = this._container;
-    const range = scrollHeight - clientHeight;
-    return range > 0 ? scrollTop / range : 0;
+  /** Return the 1-indexed page number currently most visible in the viewport. */
+  getVisiblePage() {
+    return this._visiblePageNumber() ?? 1;
   }
 
-  setScrollPercent(pct) {
-    const { scrollHeight, clientHeight } = this._container;
-    this._container.scrollTop = pct * (scrollHeight - clientHeight);
+  /** Scroll so that page N is flush with the top of the viewport. */
+  setPage(n) {
+    const wrapper = this._container.querySelector(`[data-page="${n}"]`);
+    if (wrapper) this._container.scrollTop = wrapper.offsetTop;
   }
 
   onScroll(fn) {
@@ -531,11 +531,6 @@ class PdfViewerPane {
       }
     }
     return closest;
-  }
-
-  /** Return the 1-indexed page number currently most visible (public alias). */
-  get currentPage() {
-    return this._visiblePageNumber() ?? 1;
   }
 }
 
@@ -613,17 +608,35 @@ class MarkdownEditorPane {
 
   // ── Scroll interface (used by SyncScroller) ───────────────────────────────
 
-  getScrollPercent() {
-    if (!this._editor) return 0;
-    const top   = this._editor.getScrollTop();
-    const total = this._editor.getScrollHeight() - this._editor.getLayoutInfo().height;
-    return total > 0 ? top / total : 0;
+  /**
+   * Return the <!-- page N --> number at the top of the visible Monaco viewport.
+   * Scans backwards from the first visible line to find the nearest page marker.
+   */
+  getVisiblePage() {
+    if (!this._editor) return 1;
+    const model  = this._editor.getModel();
+    const ranges = this._editor.getVisibleRanges();
+    if (!ranges.length) return 1;
+    const topLine = ranges[0].startLineNumber;
+    for (let ln = topLine; ln >= 1; ln--) {
+      const m = model.getLineContent(ln).match(/<!--\s*page\s+(\d+)\s*-->/i);
+      if (m) return parseInt(m[1], 10);
+    }
+    return 1;
   }
 
-  setScrollPercent(pct) {
+  /** Scroll Monaco so that the <!-- page N --> marker is at the top of the viewport. */
+  setPage(n) {
     if (!this._editor) return;
-    const total = this._editor.getScrollHeight() - this._editor.getLayoutInfo().height;
-    this._editor.setScrollTop(pct * total);
+    const model = this._editor.getModel();
+    const re    = new RegExp(`<!--\\s*page\\s+${n}\\s*-->`, 'i');
+    for (let ln = 1, count = model.getLineCount(); ln <= count; ln++) {
+      if (re.test(model.getLineContent(ln))) {
+        // getTopForLineNumber gives the y-offset of the line; setScrollTop is immediate.
+        this._editor.setScrollTop(this._editor.getTopForLineNumber(ln));
+        return;
+      }
+    }
   }
 
   onScroll(fn) {
@@ -683,8 +696,16 @@ class PreviewPane {
   }
 
   _render(markdownText) {
+    // Insert <a id="pg{N}"> anchors before each <!-- page N --> marker so that
+    // getVisiblePage() and setPage() can find page boundaries regardless of
+    // whether the OCR output already contains <a id="page-N"> anchors.
+    const processed = markdownText.replace(
+      /<!--\s*page\s+(\d+)\s*-->/g,
+      (_, n) => `<a id="pg${n}" class="page-anchor"></a>`,
+    );
+
     // marked.js is loaded globally from the CDN script tag in index.html.
-    this._body.innerHTML = marked.parse(markdownText, { breaks: false });
+    this._body.innerHTML = marked.parse(processed, { breaks: false });
 
     // Rewrite relative image paths to the API endpoint so the browser can
     // find extracted figures stored in output/{stem}/images/.
@@ -700,15 +721,21 @@ class PreviewPane {
 
   // ── Scroll interface (used by SyncScroller) ───────────────────────────────
 
-  getScrollPercent() {
-    const { scrollTop, scrollHeight, clientHeight } = this._body;
-    const range = scrollHeight - clientHeight;
-    return range > 0 ? scrollTop / range : 0;
+  /** Return the page number whose anchor is at or just above the current scroll top. */
+  getVisiblePage() {
+    const top  = this._body.scrollTop + 10;
+    let   page = 1;
+    this._body.querySelectorAll(".page-anchor[id^='pg']").forEach(el => {
+      const n = parseInt(el.id.slice(2), 10);
+      if (!isNaN(n) && el.offsetTop <= top) page = n;
+    });
+    return page;
   }
 
-  setScrollPercent(pct) {
-    const { scrollHeight, clientHeight } = this._body;
-    this._body.scrollTop = pct * (scrollHeight - clientHeight);
+  /** Scroll preview so that the page N anchor is at the top of the viewport. */
+  setPage(n) {
+    const anchor = this._body.querySelector(`[id="pg${n}"]`);
+    if (anchor) this._body.scrollTop = anchor.offsetTop;
   }
 
   onScroll(fn) {
@@ -719,8 +746,13 @@ class PreviewPane {
 
 // ============================================================================
 // SECTION 7: SYNC SCROLL CONTROLLER
-// Keeps the editor, preview, and PDF viewer at the same relative scroll
-// position (0–100 %).
+// Keeps all three panes showing the same page number.
+//
+// Page-based sync: each pane reports which page is at the top of its viewport
+// via getVisiblePage(), and scrolls to a target page via setPage().  This is
+// far more accurate than percentage-based sync because the three panes have
+// different scroll heights (Monaco line height ≠ PDF page height ≠ preview
+// line height).
 //
 // Mutual exclusion: when we programmatically scroll pane B in response to
 // pane A scrolling, B fires its own scroll event.  The _locked flag prevents
@@ -749,34 +781,34 @@ class SyncScroller {
   // ── Internal ──────────────────────────────────────────────────────────────
 
   _attach() {
-    // Monaco fires a rich scroll-change object; we only need the percentage.
     this._editor.onScroll(() => {
       if (!this._enabled || this._locked) return;
-      this._sync("editor", this._editor.getScrollPercent());
+      this._sync("editor", this._editor.getVisiblePage());
     });
 
     this._preview.onScroll(() => {
       if (!this._enabled || this._locked) return;
-      this._sync("preview", this._preview.getScrollPercent());
+      this._sync("preview", this._preview.getVisiblePage());
     });
 
     this._pdf.onScroll(() => {
       if (!this._enabled || this._locked) return;
-      this._sync("pdf", this._pdf.getScrollPercent());
+      this._sync("pdf", this._pdf.getVisiblePage());
     });
   }
 
   /**
-   * Propagate a scroll percentage from the source pane to the other two.
+   * Scroll the other two panes to show the same page as the source pane.
    * requestAnimationFrame defers the lock release until after the browser
    * has processed the programmatic scroll events we're about to trigger.
    */
-  _sync(source, pct) {
+  _sync(source, page) {
+    if (!page) return;
     this._locked = true;
 
-    if (source !== "editor")  this._editor.setScrollPercent(pct);
-    if (source !== "preview") this._preview.setScrollPercent(pct);
-    if (source !== "pdf")     this._pdf.setScrollPercent(pct);
+    if (source !== "editor")  this._editor.setPage(page);
+    if (source !== "preview") this._preview.setPage(page);
+    if (source !== "pdf")     this._pdf.setPage(page);
 
     requestAnimationFrame(() => { this._locked = false; });
   }

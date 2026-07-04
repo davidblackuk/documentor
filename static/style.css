@@ -383,8 +383,8 @@ html, body {
 .preview-body img { max-width: 100%; height: auto; display: block; margin: 8px 0; }
 .preview-body hr  { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
 
-/* Page marker comments are hidden in the preview */
-.preview-body .page-marker { display: none; }
+/* Page marker anchors are invisible — they exist only for scroll navigation */
+.preview-body .page-anchor { display: block; height: 0; }
 
 /* ── PDF viewer pane ─────────────────────────────────────────────────────── */
 
