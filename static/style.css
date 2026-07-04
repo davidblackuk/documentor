@@ -344,7 +344,8 @@ html, body {
   flex-shrink: 0;
 }
 
-.pdf-pane-header {
+.pdf-pane-header,
+.pane-header-bar {
   justify-content: space-between;
 }
 

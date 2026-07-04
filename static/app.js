@@ -845,8 +845,9 @@ class EditorView {
     this._btnBack      = document.getElementById("btn-back");
     this._btnSave      = document.getElementById("btn-save");
     this._btnRescan    = document.getElementById("btn-rescan-page");
-    this._syncToggle   = document.getElementById("toggle-sync-scroll");
-    this._fontSelect   = document.getElementById("font-size-select");
+    this._syncToggle        = document.getElementById("toggle-sync-scroll");
+    this._editorFontSelect  = document.getElementById("editor-font-size");
+    this._previewFontSelect = document.getElementById("preview-font-size");
     this._overlay      = document.getElementById("rescan-overlay");
     this._overlayMsg   = document.getElementById("rescan-message");
 
@@ -959,10 +960,12 @@ class EditorView {
 
     this._btnRescan.addEventListener("click", () => this._rescanCurrentPage());
 
-    this._fontSelect.addEventListener("change", () => {
-      const px = parseInt(this._fontSelect.value, 10);
-      this._editorPane.setFontSize(px);
-      this._previewBody.style.fontSize = `${px}px`;
+    this._editorFontSelect.addEventListener("change", () => {
+      this._editorPane.setFontSize(parseInt(this._editorFontSelect.value, 10));
+    });
+
+    this._previewFontSelect.addEventListener("change", () => {
+      this._previewBody.style.fontSize = `${this._previewFontSelect.value}px`;
     });
 
     // Ctrl+S / Cmd+S to save
