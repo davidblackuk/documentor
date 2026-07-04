@@ -85,6 +85,10 @@ class OcrService:
             return
 
         async with self._lock:
+            if not ocr_core.is_model_loaded():
+                yield _sse_error("Model is not loaded — load it from the dashboard first")
+                return
+
             try:
                 pdf_path = self._pdf.get_pdf_path(stem)
                 out_dir  = self._pdf.get_output_dir(stem)
@@ -92,7 +96,7 @@ class OcrService:
                 yield _sse_error(str(exc))
                 return
 
-            queue: asyncio.Queue[ScanEvent | None] = asyncio.Queue()
+            queue: asyncio.Queue[ScanEvent] = asyncio.Queue()
             loop = asyncio.get_event_loop()
 
             def on_progress(event: ScanEvent) -> None:
@@ -110,8 +114,10 @@ class OcrService:
                         on_progress=on_progress,
                     )
                 except Exception as exc:
-                    # Signal the generator that the thread failed.
-                    asyncio.run_coroutine_threadsafe(queue.put(None), loop)
+                    # Forward the real error message rather than a generic sentinel.
+                    asyncio.run_coroutine_threadsafe(
+                        queue.put(ScanEvent("error", str(exc))), loop
+                    )
                     return exc
 
             # Start the blocking work in the thread pool.
@@ -120,14 +126,7 @@ class OcrService:
             # Relay events from the queue until the scan signals completion.
             while True:
                 event = await queue.get()
-
-                if event is None:
-                    # Sentinel from the except branch in run_scan.
-                    yield _sse_error("Scan thread raised an unexpected exception")
-                    break
-
                 yield _sse(event)
-
                 if event.event_type in ("done", "error"):
                     break
 

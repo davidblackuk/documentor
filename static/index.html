@@ -11,10 +11,8 @@
   <!-- Split.js — drag-to-resize pane dividers (~2 KB) -->
   <script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
 
-  <!-- PDF.js — PDF rendering engine for the viewer pane -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.mjs" type="module" id="pdfjs-script"></script>
-
   <!-- Monaco Editor loader — deferred until the editor view is opened -->
+  <!-- PDF.js is loaded lazily via dynamic import() in PdfViewerPane.load() -->
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
 
   <link rel="stylesheet" href="style.css" />

@@ -407,17 +407,9 @@ class PdfViewerPane {
   // ── Loading ───────────────────────────────────────────────────────────────
 
   async load(pdfUrl) {
-    // PDF.js is loaded as an ES module via index.html; access it from the
-    // window-scoped global the loader registers as pdfjsLib.
-    const pdfjsLib = window["pdfjs-dist/build/pdf"];
-    if (pdfjsLib) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs";
-    }
-
-    // Dynamically import PDF.js if the global isn't available yet
-    // (handles the module script loading race).
-    const lib = pdfjsLib ?? await import(
+    // PDF.js is loaded on first use via dynamic import so the heavy library
+    // doesn't block the dashboard page load.
+    const lib = await import(
       "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.mjs"
     );
 
