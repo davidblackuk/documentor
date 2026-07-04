@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocuMentor</title>
+
+  <!-- marked.js — Markdown → HTML rendering for the preview pane -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+
+  <!-- Split.js — drag-to-resize pane dividers (~2 KB) -->
+  <script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
+
+  <!-- PDF.js — PDF rendering engine for the viewer pane -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.mjs" type="module" id="pdfjs-script"></script>
+
+  <!-- Monaco Editor loader — deferred until the editor view is opened -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!--
+    Single-page application shell.
+    The App class in app.js swaps between #view-dashboard and #view-editor
+    by toggling the .active class; everything else is rendered dynamically.
+  -->
+
+  <div id="app">
+    <!-- ── Dashboard view ──────────────────────────────────────────────── -->
+    <div id="view-dashboard" class="view active">
+
+      <header class="app-header">
+        <span class="app-title">DocuMentor</span>
+        <div class="model-controls">
+          <span id="model-status-label" class="model-status-label">Model: checking…</span>
+          <button id="btn-load-model"   class="btn btn-primary"   >Load</button>
+          <button id="btn-unload-model" class="btn btn-secondary"  >Unload</button>
+        </div>
+      </header>
+
+      <main class="dashboard-main">
+        <div class="dashboard-toolbar">
+          <h2 class="section-title">Documents</h2>
+          <button id="btn-scan-selected" class="btn btn-primary" disabled>
+            Scan Selected
+          </button>
+        </div>
+
+        <div id="pdf-list" class="pdf-list">
+          <div class="loading-placeholder">Loading…</div>
+        </div>
+
+        <!-- Scan progress panel — hidden until a scan starts -->
+        <div id="scan-progress-panel" class="scan-progress-panel hidden">
+          <div class="progress-header">
+            <span id="progress-filename" class="progress-filename"></span>
+            <span id="progress-fraction" class="progress-fraction"></span>
+          </div>
+          <div class="progress-bar-track">
+            <div id="progress-bar-fill" class="progress-bar-fill" style="width:0%"></div>
+          </div>
+          <div id="scan-log" class="scan-log"></div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ── Editor view ─────────────────────────────────────────────────── -->
+    <div id="view-editor" class="view">
+
+      <header class="app-header editor-header">
+        <button id="btn-back" class="btn btn-ghost">← Dashboard</button>
+        <span id="editor-title" class="editor-title"></span>
+        <div class="editor-header-actions">
+          <span id="save-status" class="save-status"></span>
+          <button id="btn-save"   class="btn btn-primary"  >Save</button>
+          <button id="btn-rescan-page" class="btn btn-secondary">Rescan Page</button>
+          <label class="toggle-label">
+            <input type="checkbox" id="toggle-sync-scroll" checked />
+            Sync Scroll
+          </label>
+        </div>
+      </header>
+
+      <div id="editor-panes" class="editor-panes">
+
+        <!-- Pane 1: Markdown editor (Monaco) -->
+        <div id="pane-editor" class="pane">
+          <div class="pane-header">Markdown</div>
+          <div id="monaco-container" class="pane-body monaco-container"></div>
+        </div>
+
+        <!-- Pane 2: Live preview (marked.js) -->
+        <div id="pane-preview" class="pane">
+          <div class="pane-header">Preview</div>
+          <div id="preview-body" class="pane-body preview-body"></div>
+        </div>
+
+        <!-- Pane 3: PDF viewer (PDF.js) -->
+        <div id="pane-pdf" class="pane">
+          <div class="pane-header pdf-pane-header">
+            <span>PDF</span>
+            <span id="pdf-page-indicator" class="pdf-page-indicator"></span>
+          </div>
+          <div id="pdf-body" class="pane-body pdf-body"></div>
+        </div>
+
+      </div>
+
+      <!-- Rescan overlay — shown while a single-page rescan is running -->
+      <div id="rescan-overlay" class="rescan-overlay hidden">
+        <div class="rescan-spinner"></div>
+        <span id="rescan-message" class="rescan-message">Rescanning page…</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

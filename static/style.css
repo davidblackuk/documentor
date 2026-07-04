@@ -1,0 +1,462 @@
+/* ============================================================================
+   DocuMentor — stylesheet
+   Dark theme throughout; CSS custom properties for all colours so a light
+   theme can be added later by swapping the :root block.
+   ============================================================================ */
+
+/* ── Design tokens ─────────────────────────────────────────────────────────── */
+
+:root {
+  --bg-base:       #1e1e1e;   /* main background (matches Monaco vs-dark) */
+  --bg-surface:    #252526;   /* cards, panels */
+  --bg-elevated:   #2d2d30;   /* hover states, selected rows */
+  --bg-header:     #323233;   /* app header bar */
+  --border:        #3e3e42;   /* dividers and outlines */
+
+  --text-primary:  #cccccc;
+  --text-secondary:#9d9d9d;
+  --text-dim:      #666;
+
+  --accent:        #007acc;   /* primary action colour */
+  --accent-hover:  #1a8dd4;
+  --danger:        #f44747;
+  --success:       #4ec9b0;
+  --warning:       #dcdcaa;
+
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
+
+  --header-h:  48px;
+  --pane-hdr:  32px;
+  --radius:    4px;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;    /* views manage their own scroll */
+}
+
+/* ── View switcher ───────────────────────────────────────────────────────────
+   Only .active views are visible; transitions slide between them.          */
+
+#app    { height: 100vh; position: relative; overflow: hidden; }
+
+.view   { display: none; flex-direction: column; height: 100vh; }
+.view.active { display: flex; }
+
+/* ── Shared: app header ──────────────────────────────────────────────────── */
+
+.app-header {
+  height: var(--header-h);
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.app-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+/* ── Shared: buttons ─────────────────────────────────────────────────────── */
+
+.btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary   { background: var(--accent);   color: #fff; }
+.btn-primary:hover:not(:disabled)   { background: var(--accent-hover); }
+
+.btn-secondary { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-secondary:hover:not(:disabled) { background: #3a3a3d; }
+
+.btn-ghost     { background: transparent; color: var(--text-secondary); }
+.btn-ghost:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-elevated); }
+
+/* ── Dashboard: model controls ───────────────────────────────────────────── */
+
+.model-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-status-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+
+.model-status-label.loaded   { color: var(--success); }
+.model-status-label.unloaded { color: var(--text-dim); }
+
+/* ── Dashboard: main content ─────────────────────────────────────────────── */
+
+.dashboard-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px;
+  gap: 16px;
+}
+
+.dashboard-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ── Dashboard: PDF list ─────────────────────────────────────────────────── */
+
+.pdf-list {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.pdf-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  transition: background 0.1s;
+}
+
+.pdf-row:last-child { border-bottom: none; }
+.pdf-row:hover      { background: var(--bg-elevated); }
+
+.pdf-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+
+.pdf-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-pages {
+  font-size: 12px;
+  color: var(--text-dim);
+  width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.status-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  flex-shrink: 0;
+  width: 72px;
+  text-align: center;
+}
+
+.status-scanned { background: rgba(78,201,176,0.15); color: var(--success); }
+.status-partial { background: rgba(220,220,170,0.15); color: var(--warning); }
+.status-pending { background: rgba(100,100,100,0.15); color: var(--text-dim); }
+
+.btn-edit {
+  font-size: 12px;
+  padding: 3px 10px;
+  flex-shrink: 0;
+}
+
+/* ── Dashboard: scan progress ────────────────────────────────────────────── */
+
+.scan-progress-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  flex-shrink: 0;
+}
+
+.scan-progress-panel.hidden { display: none; }
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.progress-filename { color: var(--text-primary); font-weight: 500; }
+.progress-fraction { color: var(--text-secondary); }
+
+.progress-bar-track {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.scan-log {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  max-height: 80px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+/* ── Editor: header ──────────────────────────────────────────────────────── */
+
+.editor-header { gap: 8px; }
+
+.editor-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-status {
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 60px;
+  text-align: right;
+}
+
+.save-status.dirty  { color: var(--warning); }
+.save-status.saved  { color: var(--success); }
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── Editor: three-pane layout ───────────────────────────────────────────── */
+
+.editor-panes {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Split.js injects width styles; we provide height and overflow behaviour. */
+.pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;          /* allow panes to shrink below content width */
+}
+
+/* Split.js gutter styling */
+.gutter {
+  background: var(--border);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.gutter:hover { background: var(--accent); }
+
+.pane-header {
+  height: var(--pane-hdr);
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.pdf-pane-header {
+  justify-content: space-between;
+}
+
+.pdf-page-indicator {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: normal;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.pane-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Monaco container ────────────────────────────────────────────────────── */
+
+.monaco-container {
+  /* Monaco measures its container; height must be explicit or it collapses. */
+  height: 100%;
+  width: 100%;
+}
+
+/* ── Preview pane ────────────────────────────────────────────────────────── */
+
+.preview-body {
+  padding: 20px 24px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  line-height: 1.7;
+}
+
+/* Markdown element styles inside the preview */
+.preview-body h1,
+.preview-body h2,
+.preview-body h3 { color: var(--text-primary); margin: 1.2em 0 0.4em; }
+.preview-body h1 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.preview-body h2 { font-size: 1.2em; }
+.preview-body p  { margin: 0.6em 0; }
+.preview-body code { font-family: var(--font-mono); font-size: 12px; background: var(--bg-elevated); padding: 1px 4px; border-radius: 3px; }
+.preview-body pre  { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; overflow-x: auto; margin: 0.8em 0; }
+.preview-body pre code { background: none; padding: 0; }
+.preview-body table { border-collapse: collapse; margin: 0.8em 0; width: 100%; font-size: 13px; }
+.preview-body th, .preview-body td { border: 1px solid var(--border); padding: 5px 10px; text-align: left; }
+.preview-body th { background: var(--bg-elevated); }
+.preview-body blockquote { border-left: 3px solid var(--accent); margin: 0.6em 0; padding: 4px 12px; color: var(--text-secondary); }
+.preview-body img { max-width: 100%; height: auto; display: block; margin: 8px 0; }
+.preview-body hr  { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+
+/* Page marker comments are hidden in the preview */
+.preview-body .page-marker { display: none; }
+
+/* ── PDF viewer pane ─────────────────────────────────────────────────────── */
+
+.pdf-body {
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+}
+
+/* Individual PDF page canvas wrappers */
+.pdf-page-wrapper {
+  width: 100%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  background: #fff;   /* page background stays white like a real document */
+  border-radius: 2px;
+  overflow: hidden;
+  line-height: 0;     /* remove gap below inline canvas */
+}
+
+.pdf-page-wrapper canvas {
+  width: 100%;
+  display: block;
+}
+
+/* ── Rescan overlay ──────────────────────────────────────────────────────── */
+
+.rescan-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 20;
+}
+
+.rescan-overlay.hidden { display: none; }
+
+.rescan-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--bg-elevated);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.rescan-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ── Utility ─────────────────────────────────────────────────────────────── */
+
+.hidden    { display: none !important; }
+
+/* Thin scrollbars to match VS Code feel */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #777; }
+
+.loading-placeholder {
+  padding: 20px;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+}
