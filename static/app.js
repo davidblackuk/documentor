@@ -871,16 +871,33 @@ class EditorView {
     this._wireToolbar();
   }
 
-  // ── Last-position persistence (localStorage) ──────────────────────────────
+  // ── Per-document persistence (localStorage) ──────────────────────────────
 
   _saveLastPage(page) {
-    if (this._stem && page) {
-      localStorage.setItem(`documenter.page.${this._stem}`, page);
-    }
+    if (this._stem && page) localStorage.setItem(`documenter.page.${this._stem}`, page);
   }
 
   _loadLastPage(stem) {
     return parseInt(localStorage.getItem(`documenter.page.${stem}`), 10) || 1;
+  }
+
+  _saveFontSizes(stem) {
+    localStorage.setItem(`documenter.editorFont.${stem}`, this._editorFontSelect.value);
+    localStorage.setItem(`documenter.previewFont.${stem}`, this._previewFontSelect.value);
+  }
+
+  _restoreFontSizes(stem) {
+    const edPx   = parseInt(localStorage.getItem(`documenter.editorFont.${stem}`),  10);
+    const prevPx = parseInt(localStorage.getItem(`documenter.previewFont.${stem}`), 10);
+
+    if (edPx) {
+      this._editorFontSelect.value = edPx;
+      this._editorPane.setFontSize(edPx);
+    }
+    if (prevPx) {
+      this._previewFontSelect.value = prevPx;
+      this._previewBody.style.fontSize = `${prevPx}px`;
+    }
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -915,6 +932,9 @@ class EditorView {
 
     // Render initial preview
     this._previewPane.update(markdown, stem);
+
+    // Restore per-document font sizes (instant — no layout dependency).
+    this._restoreFontSizes(stem);
 
     // Restore the last scroll position for this document.  The small delay
     // lets the PDF container finish its initial layout before we set scrollTop.
@@ -996,10 +1016,12 @@ class EditorView {
 
     this._editorFontSelect.addEventListener("change", () => {
       this._editorPane.setFontSize(parseInt(this._editorFontSelect.value, 10));
+      this._saveFontSizes(this._stem);
     });
 
     this._previewFontSelect.addEventListener("change", () => {
       this._previewBody.style.fontSize = `${this._previewFontSelect.value}px`;
+      this._saveFontSizes(this._stem);
     });
 
     // Ctrl+S / Cmd+S to save
