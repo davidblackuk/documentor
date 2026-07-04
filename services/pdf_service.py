@@ -151,6 +151,18 @@ class PdfService:
         replacement = rf"\1\n\n{re.escape(new_text)}\n\n"
         updated = re.sub(pattern, replacement, content, count=1, flags=re.DOTALL)
 
+        # If the regex matched nothing the marker was missing.  Insert the page
+        # at the correct sorted position: just before the first marker whose
+        # page number is greater than page_num (or at the end of the file).
+        if updated == content:
+            insert = f"<!-- page {page_num} -->\n\n{new_text}\n\n"
+            pos = len(content)
+            for m in re.finditer(r"<!-- page (\d+) -->", content):
+                if int(m.group(1)) > page_num:
+                    pos = m.start()
+                    break
+            updated = content[:pos].rstrip("\n") + "\n\n" + insert + content[pos:]
+
         self.save_markdown(stem, updated)
         return updated
 
