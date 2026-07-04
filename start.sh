@@ -1,5 +1,7 @@
 #!/bin/bash
 
-source /home/davidb/Documents/AI/ocr-venv/bin/activate
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-python /home/davidb/Documents/AI/ocr-venv/documenter.py
+source "$SCRIPT_DIR/bin/activate"
+
+python "$SCRIPT_DIR/documenter.py"
