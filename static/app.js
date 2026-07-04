@@ -578,6 +578,35 @@ class MarkdownEditorPane {
           padding:       { top: 12 },
         });
 
+        // Surround selected text when * or _ is typed, instead of replacing.
+        // Monaco's built-in autoSurround handles backticks; add * and _ here.
+        // Keeping the wrapped content selected lets a second * press give **text**.
+        this._editor.onKeyDown(e => {
+          const ch = e.browserEvent.key;
+          if (ch !== '*' && ch !== '_') return;
+          const sel = this._editor.getSelection();
+          if (!sel || sel.isEmpty()) return;
+
+          e.preventDefault();
+          e.stopPropagation();
+
+          const text = this._editor.getModel().getValueInRange(sel);
+          this._editor.executeEdits('md-surround', [{
+            range: sel,
+            text:  `${ch}${text}${ch}`,
+            forceMoveMarkers: true,
+          }]);
+
+          // Re-select the wrapped content so pressing * again upgrades to **text**.
+          // Single-line: end shifts by +2 (leading ch shifts col right, trailing ch extends).
+          // Multi-line:  end shifts by +1 (only the trailing ch is on the end line).
+          const sameLine = sel.startLineNumber === sel.endLineNumber;
+          this._editor.setSelection(new monaco.Selection(
+            sel.startLineNumber, sel.startColumn,
+            sel.endLineNumber,   sel.endColumn + (sameLine ? 2 : 1),
+          ));
+        });
+
         this._ready = true;
         resolve();
       });
