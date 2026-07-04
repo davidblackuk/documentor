@@ -1,0 +1,17 @@
+# Python venv
+bin/
+include/
+lib/
+lib64/
+share/
+pyvenv.cfg
+
+# Pipeline I/O — large PDFs, images, and generated markdown
+input/
+output/
+preview/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
