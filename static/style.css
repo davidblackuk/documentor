@@ -1,16 +1,18 @@
 /* ============================================================================
    DocuMentor — stylesheet
-   Dark theme throughout; CSS custom properties for all colours so a light
-   theme can be added later by swapping the :root block.
+   CSS custom properties for all colours; the light theme overrides them in
+   the :root[data-theme="light"] block below. Theme is toggled via a
+   data-theme attribute on <html>, set and persisted by app.js.
    ============================================================================ */
 
-/* ── Design tokens ─────────────────────────────────────────────────────────── */
+/* ── Design tokens: dark (default) ───────────────────────────────────────── */
 
 :root {
   --bg-base:       #1e1e1e;   /* main background (matches Monaco vs-dark) */
   --bg-surface:    #252526;   /* cards, panels */
   --bg-elevated:   #2d2d30;   /* hover states, selected rows */
   --bg-header:     #323233;   /* app header bar */
+  --bg-hover:      #3a3a3d;   /* stronger hover state than --bg-elevated */
   --border:        #3e3e42;   /* dividers and outlines */
 
   --text-primary:  #cccccc;
@@ -23,12 +25,39 @@
   --success:       #4ec9b0;
   --warning:       #dcdcaa;
 
+  --scrollbar-thumb:       #555;
+  --scrollbar-thumb-hover: #777;
+
   --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
 
   --header-h:  48px;
   --pane-hdr:  32px;
   --radius:    4px;
+}
+
+/* ── Design tokens: light ─────────────────────────────────────────────────── */
+
+:root[data-theme="light"] {
+  --bg-base:       #ffffff;
+  --bg-surface:    #f3f3f3;
+  --bg-elevated:   #e8e8e8;
+  --bg-header:     #f3f3f3;
+  --bg-hover:      #dcdcdc;
+  --border:        #d4d4d4;
+
+  --text-primary:  #1e1e1e;
+  --text-secondary:#5f5f5f;
+  --text-dim:      #8a8a8a;
+
+  --accent:        #007acc;
+  --accent-hover:  #005a9e;
+  --danger:        #c72e2e;
+  --success:       #1f8a5f;
+  --warning:       #9a7d0a;
+
+  --scrollbar-thumb:       #c1c1c1;
+  --scrollbar-thumb-hover: #a8a8a8;
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */
@@ -78,11 +107,13 @@ html, body {
 /* ── Shared: buttons ─────────────────────────────────────────────────────── */
 
 .btn {
+  display: inline-block;
   padding: 5px 14px;
   border: none;
   border-radius: var(--radius);
   font-size: 13px;
   font-family: var(--font-ui);
+  text-decoration: none;
   cursor: pointer;
   transition: background 0.15s;
   white-space: nowrap;
@@ -97,10 +128,27 @@ html, body {
 .btn-primary:hover:not(:disabled)   { background: var(--accent-hover); }
 
 .btn-secondary { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); }
-.btn-secondary:hover:not(:disabled) { background: #3a3a3d; }
+.btn-secondary:hover:not(:disabled) { background: var(--bg-hover); }
 
 .btn-ghost     { background: transparent; color: var(--text-secondary); }
 .btn-ghost:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-elevated); }
+
+.btn-theme-toggle {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-theme-toggle:hover { background: var(--bg-hover); }
 
 /* ── Dashboard: model controls ───────────────────────────────────────────── */
 
@@ -126,8 +174,15 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 20px;
   gap: 16px;
+  /* Bootstrap-style container: caps content width and centers it with
+     gutters, so the pdf-row layout doesn't stretch edge-to-edge on wide
+     screens. The editor's three-pane view is intentionally excluded from
+     this and stays full width. */
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 20px 24px;
 }
 
 .dashboard-toolbar {
@@ -372,7 +427,7 @@ html, body {
   transition: background 0.15s;
 }
 
-.btn-pane-move:hover:not(:disabled) { background: #3a3a3d; color: var(--text-primary); }
+.btn-pane-move:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 .btn-pane-move:disabled             { opacity: 0.3; cursor: not-allowed; }
 
 .pdf-page-indicator {
@@ -493,8 +548,8 @@ html, body {
 /* Thin scrollbars to match VS Code feel */
 ::-webkit-scrollbar       { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #777; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 .loading-placeholder {
   padding: 20px;

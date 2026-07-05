@@ -19,6 +19,8 @@
 
 "use strict";
 
+import { initTheme } from "./theme.js";
+
 // ============================================================================
 // SECTION 1: API CLIENT
 // All server communication in one place. Routes are string constants to avoid
@@ -294,6 +296,12 @@ class DashboardView {
         <span class="pdf-name" title="${p.filename}">${p.filename}</span>
         <span class="pdf-pages">${p.page_count} pp</span>
         <span class="status-badge status-${p.status}">${p.status}</span>
+        <a class="btn btn-secondary btn-edit" target="_blank" rel="noopener"
+           href="${Api.pdfUrl(p.stem)}">PDF</a>
+        ${p.status === "scanned" ? `
+          <a class="btn btn-secondary btn-edit" target="_blank" rel="noopener"
+             href="/preview.html?stem=${encodeURIComponent(p.stem)}">Markdown</a>
+        ` : ""}
         <button class="btn btn-secondary btn-edit" data-stem="${p.stem}">Edit</button>
       </div>
     `).join("");
@@ -567,7 +575,7 @@ class MarkdownEditorPane {
         this._editor = monaco.editor.create(this._container, {
           value:         initialContent,
           language:      "markdown",
-          theme:         "vs-dark",
+          theme:         document.documentElement.dataset.theme === "light" ? "vs" : "vs-dark",
           wordWrap:      "on",
           minimap:       { enabled: false },
           fontSize:      14,
@@ -631,6 +639,13 @@ class MarkdownEditorPane {
   /** Adjust the editor font size without rebuilding the editor instance. */
   setFontSize(px) {
     this._editor?.updateOptions({ fontSize: px });
+  }
+
+  /** monaco.editor.setTheme is global (not per-instance) and only exists once
+   *  the AMD bundle has loaded, so this is a no-op until init() resolves. */
+  setTheme(theme) {
+    if (!this._ready) return;
+    monaco.editor.setTheme(theme === "light" ? "vs" : "vs-dark");
   }
 
   /**
@@ -907,6 +922,10 @@ class EditorView {
 
     this._wireToolbar();
     this._wirePaneMoveButtons();
+
+    // Monaco's theme is set at creation time from the current preference
+    // (see MarkdownEditorPane.init); this keeps it in sync on live toggles.
+    window.addEventListener("documenter-theme-change", (e) => this._editorPane.setTheme(e.detail));
   }
 
   // ── Per-document persistence (localStorage) ──────────────────────────────
@@ -1241,6 +1260,8 @@ class App {
 
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
+
+initTheme();
 
 const app = new App();
 app.start().catch(console.error);
