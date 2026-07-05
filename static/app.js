@@ -296,7 +296,7 @@ class DashboardView {
         <span class="pdf-name" title="${p.filename}">${p.filename}</span>
         <span class="pdf-pages">${p.page_count} pp</span>
         <span class="status-badge status-${p.status}">${p.status}</span>
-        <a class="btn btn-secondary btn-edit" target="_blank" rel="noopener"
+        <a class="btn btn-secondary btn-edit"
            href="${Api.pdfUrl(p.stem)}">PDF</a>
         ${p.status === "scanned" ? `
           <a class="btn btn-secondary btn-edit"
