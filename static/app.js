@@ -299,7 +299,7 @@ class DashboardView {
         <a class="btn btn-secondary btn-edit" target="_blank" rel="noopener"
            href="${Api.pdfUrl(p.stem)}">PDF</a>
         ${p.status === "scanned" ? `
-          <a class="btn btn-secondary btn-edit" target="_blank" rel="noopener"
+          <a class="btn btn-secondary btn-edit"
              href="/preview.html?stem=${encodeURIComponent(p.stem)}">Markdown</a>
         ` : ""}
         <button class="btn btn-secondary btn-edit" data-stem="${p.stem}">Edit</button>
