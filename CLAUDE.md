@@ -49,6 +49,10 @@ preview/    ← temporary output from Test Scan (page-range previews)
 - Output file is `result.mmd` in the temp directory passed as `output_path`.
 - `MODELS["marker"]` stub exists for future integration but is not implemented.
 
+## Git conventions
+
+- Do not add a `Co-Authored-By: Claude` (or similar attribution) line to commit messages.
+
 ## Known issues
 
 - Code pages (dense text, listings) sometimes trigger a repetition loop in the model, producing very long outputs. No mitigation is currently in place.
