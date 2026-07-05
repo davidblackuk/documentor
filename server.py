@@ -44,14 +44,30 @@ app.add_middleware(
 # per-document localStorage (font sizes, edit positions) silently forks
 # depending on which hostname was used. Canonicalize on 127.0.0.1, which
 # is what start.sh binds and prints, so localStorage stays under one origin.
+#
+# /api/* is excluded: redirecting an in-page fetch() cross-origin requires
+# CORS headers on the final response, which we don't send for localhost,
+# so the browser blocks it. The API behaves identically on either
+# hostname, so there's nothing to gain by redirecting it anyway — only
+# the document/static routes need to converge for localStorage's sake.
 @app.middleware("http")
 async def canonicalize_host(request: Request, call_next):
     host = request.headers.get("host", "")
-    if host.startswith("localhost:") or host == "localhost":
+    is_localhost = host.startswith("localhost:") or host == "localhost"
+    is_api = request.url.path.startswith("/api/")
+    if is_localhost and not is_api:
         new_host = host.replace("localhost", "127.0.0.1", 1)
         url = request.url.replace(netloc=new_host)
         return RedirectResponse(url=str(url), status_code=307)
-    return await call_next(request)
+    response = await call_next(request)
+    if not is_api:
+        # StaticFiles sends only Last-Modified/ETag, so browsers apply
+        # heuristic caching and can serve a stale localhost:8000 document
+        # straight from disk cache without ever hitting the server again
+        # — which would silently skip the redirect above. Force
+        # revalidation on every navigation so that can't happen.
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 # ── API routers ───────────────────────────────────────────────────────────────
 
