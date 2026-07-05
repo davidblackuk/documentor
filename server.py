@@ -14,8 +14,9 @@ services and routers packages.
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import ocr_core
@@ -37,6 +38,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# "localhost" and "127.0.0.1" are different origins to the browser, so
+# per-document localStorage (font sizes, edit positions) silently forks
+# depending on which hostname was used. Canonicalize on 127.0.0.1, which
+# is what start.sh binds and prints, so localStorage stays under one origin.
+@app.middleware("http")
+async def canonicalize_host(request: Request, call_next):
+    host = request.headers.get("host", "")
+    if host.startswith("localhost:") or host == "localhost":
+        new_host = host.replace("localhost", "127.0.0.1", 1)
+        url = request.url.replace(netloc=new_host)
+        return RedirectResponse(url=str(url), status_code=307)
+    return await call_next(request)
 
 # ── API routers ───────────────────────────────────────────────────────────────
 
