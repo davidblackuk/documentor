@@ -860,6 +860,8 @@ class SyncScroller {
 // and the auto-save / rescan flows.
 // ============================================================================
 
+const PANE_IDS = ["pane-editor", "pane-preview", "pane-pdf"];
+
 class EditorView {
   /**
    * @param {EventBus} bus — listens for "open-editor", emits "back-to-dashboard"
@@ -897,7 +899,14 @@ class EditorView {
     this._splitInstance  = null;
     this._savePageTimer  = null;
 
+    // Pane order — a layout preference, not per-document, so it's loaded
+    // and applied once here rather than in open().
+    this._panesContainer = document.getElementById("editor-panes");
+    this._paneOrder = this._loadPaneOrder();
+    this._applyPaneOrder();
+
     this._wireToolbar();
+    this._wirePaneMoveButtons();
   }
 
   // ── Per-document persistence (localStorage) ──────────────────────────────
@@ -927,6 +936,61 @@ class EditorView {
       this._previewFontSelect.value = prevPx;
       this._previewBody.style.fontSize = `${prevPx}px`;
     }
+  }
+
+  // ── Pane order (localStorage) ─────────────────────────────────────────────
+
+  _loadPaneOrder() {
+    try {
+      const stored = JSON.parse(localStorage.getItem("documenter.paneOrder"));
+      if (Array.isArray(stored) &&
+          stored.length === PANE_IDS.length &&
+          PANE_IDS.every((id) => stored.includes(id))) {
+        return stored;
+      }
+    } catch { /* malformed value — fall through to default */ }
+    return [...PANE_IDS];
+  }
+
+  _savePaneOrder() {
+    localStorage.setItem("documenter.paneOrder", JSON.stringify(this._paneOrder));
+  }
+
+  _applyPaneOrder() {
+    for (const id of this._paneOrder) {
+      this._panesContainer.appendChild(document.getElementById(id));
+    }
+  }
+
+  _wirePaneMoveButtons() {
+    for (const btn of document.querySelectorAll(".btn-pane-move")) {
+      btn.addEventListener("click", () => this._movePane(btn.dataset.pane, btn.dataset.move));
+    }
+    this._updatePaneMoveButtons();
+  }
+
+  _updatePaneMoveButtons() {
+    for (const btn of document.querySelectorAll(".btn-pane-move")) {
+      const i = this._paneOrder.indexOf(btn.dataset.pane);
+      btn.disabled = btn.dataset.move === "left" ? i === 0 : i === this._paneOrder.length - 1;
+    }
+  }
+
+  _movePane(paneId, direction) {
+    const i = this._paneOrder.indexOf(paneId);
+    const j = direction === "left" ? i - 1 : i + 1;
+    if (j < 0 || j >= this._paneOrder.length) return;
+
+    // Sizes track DOM position, not pane identity — swap them alongside the
+    // order so a pane keeps its own width as it moves.
+    const sizes = this._splitInstance ? this._splitInstance.getSizes() : null;
+    [this._paneOrder[i], this._paneOrder[j]] = [this._paneOrder[j], this._paneOrder[i]];
+    if (sizes) [sizes[i], sizes[j]] = [sizes[j], sizes[i]];
+
+    this._applyPaneOrder();
+    this._savePaneOrder();
+    this._recreateSplit(sizes);
+    this._updatePaneMoveButtons();
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -981,11 +1045,19 @@ class EditorView {
 
   _initSplit() {
     if (this._splitInstance) return;   // only create once
+    this._recreateSplit([34, 33, 33]);
+  }
+
+  /** (Re)builds the Split.js instance for the current pane order. Used both
+   *  for the first-open setup and whenever panes are reordered, since
+   *  Split.js bakes DOM order into its gutters at construction time. */
+  _recreateSplit(sizes) {
+    if (this._splitInstance) this._splitInstance.destroy();
 
     this._splitInstance = Split(
-      ["#pane-editor", "#pane-preview", "#pane-pdf"],
+      this._paneOrder.map((id) => `#${id}`),
       {
-        sizes:     [34, 33, 33],
+        sizes:     sizes || [34, 33, 33],
         minSize:   200,
         gutterSize: 6,
         direction: "horizontal",
@@ -994,6 +1066,7 @@ class EditorView {
         onDragEnd: () => window.dispatchEvent(new Event("resize")),
       },
     );
+    window.dispatchEvent(new Event("resize"));
   }
 
   // ── Sync scroll ───────────────────────────────────────────────────────────

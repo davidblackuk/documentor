@@ -349,6 +349,32 @@ html, body {
   justify-content: space-between;
 }
 
+.pane-title-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-pane-move {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  text-transform: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-pane-move:hover:not(:disabled) { background: #3a3a3d; color: var(--text-primary); }
+.btn-pane-move:disabled             { opacity: 0.3; cursor: not-allowed; }
+
 .pdf-page-indicator {
   font-size: 11px;
   color: var(--text-dim);

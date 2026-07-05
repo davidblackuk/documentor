@@ -89,7 +89,11 @@
         <!-- Pane 1: Markdown editor (Monaco) -->
         <div id="pane-editor" class="pane">
           <div class="pane-header pane-header-bar">
-            <span>Markdown</span>
+            <div class="pane-title-group">
+              <span>Markdown</span>
+              <button class="btn-pane-move" data-pane="pane-editor" data-move="left"  title="Move pane left">‹</button>
+              <button class="btn-pane-move" data-pane="pane-editor" data-move="right" title="Move pane right">›</button>
+            </div>
             <select id="editor-font-size" class="font-size-select">
               <option value="12">12px</option>
               <option value="13">13px</option>
@@ -120,7 +124,11 @@
         <!-- Pane 2: Live preview (marked.js) -->
         <div id="pane-preview" class="pane">
           <div class="pane-header pane-header-bar">
-            <span>Preview</span>
+            <div class="pane-title-group">
+              <span>Preview</span>
+              <button class="btn-pane-move" data-pane="pane-preview" data-move="left"  title="Move pane left">‹</button>
+              <button class="btn-pane-move" data-pane="pane-preview" data-move="right" title="Move pane right">›</button>
+            </div>
             <select id="preview-font-size" class="font-size-select">
               <option value="12">12px</option>
               <option value="13">13px</option>
@@ -151,7 +159,11 @@
         <!-- Pane 3: PDF viewer (PDF.js) -->
         <div id="pane-pdf" class="pane">
           <div class="pane-header pdf-pane-header">
-            <span>PDF</span>
+            <div class="pane-title-group">
+              <span>PDF</span>
+              <button class="btn-pane-move" data-pane="pane-pdf" data-move="left"  title="Move pane left">‹</button>
+              <button class="btn-pane-move" data-pane="pane-pdf" data-move="right" title="Move pane right">›</button>
+            </div>
             <span id="pdf-page-indicator" class="pdf-page-indicator"></span>
           </div>
           <div id="pdf-body" class="pane-body pdf-body"></div>
