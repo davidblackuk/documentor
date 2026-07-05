@@ -297,7 +297,7 @@ class DashboardView {
         <span class="pdf-pages">${p.page_count} pp</span>
         <span class="status-badge status-${p.status}">${p.status}</span>
         <a class="btn btn-secondary btn-edit"
-           href="${Api.pdfUrl(p.stem)}">PDF</a>
+           href="/pdf-view.html?stem=${encodeURIComponent(p.stem)}">PDF</a>
         ${p.status === "scanned" ? `
           <a class="btn btn-secondary btn-edit"
              href="/preview.html?stem=${encodeURIComponent(p.stem)}">Markdown</a>
