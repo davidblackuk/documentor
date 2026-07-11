@@ -225,6 +225,50 @@ class PdfService:
         self.save_markdown(stem, updated)
         return updated
 
+    # ── Version history ───────────────────────────────────────────────────────
+
+    def list_versions(self, stem: str) -> list[dict]:
+        """
+        Return committed snapshots of this document's markdown, newest first.
+
+        Each entry is a prior state of output/<stem>/<stem>.md captured by
+        _snapshot() (auto, before every overwrite) or backup_output() (manual,
+        user-triggered push). The current on-disk content is *not* included
+        here — it's already available via get_markdown() and may not be
+        committed yet.
+        """
+        repo = ocr_core.OUTPUT_DIR
+        if not (repo / ".git").exists():
+            return []
+
+        rel = f"{stem}/{stem}.md"
+        result = subprocess.run(
+            ["git", "-C", str(repo), "log", "--format=%H|%aI|%s", "--", rel],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            return []
+
+        versions = []
+        for line in result.stdout.splitlines():
+            if not line:
+                continue
+            commit_hash, date, message = line.split("|", 2)
+            versions.append({"hash": commit_hash, "date": date, "message": message})
+        return versions
+
+    def get_markdown_at_revision(self, stem: str, rev: str) -> str:
+        """Return the markdown content for a document as of a prior commit."""
+        repo = ocr_core.OUTPUT_DIR
+        rel  = f"{stem}/{stem}.md"
+        result = subprocess.run(
+            ["git", "-C", str(repo), "show", f"{rev}:{rel}"],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            raise FileNotFoundError(f"Revision '{rev}' not found for '{stem}'")
+        return result.stdout
+
     # ── Page count helper ─────────────────────────────────────────────────────
 
     def get_page_count(self, stem: str) -> int:

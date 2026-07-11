@@ -41,6 +41,23 @@ def get_markdown(stem: str, svc: PdfService = Depends(get_pdf_service)):
     return {"content": svc.get_markdown(stem)}
 
 
+@router.get("/pdf/{stem}/versions")
+def get_versions(stem: str, svc: PdfService = Depends(get_pdf_service)):
+    """Return committed markdown snapshots for a document, newest first."""
+    return svc.list_versions(stem)
+
+
+@router.get("/pdf/{stem}/content/{rev}")
+def get_markdown_at_revision(
+    stem: str, rev: str, svc: PdfService = Depends(get_pdf_service)
+):
+    """Return the markdown content for a document as of a prior commit."""
+    try:
+        return {"content": svc.get_markdown_at_revision(stem, rev)}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.put("/pdf/{stem}/content")
 def save_markdown(
     stem: str,

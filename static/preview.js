@@ -6,21 +6,58 @@ import { initTheme } from "./theme.js";
 
 const stem = new URLSearchParams(location.search).get("stem") || "";
 
-const titleEl = document.getElementById("preview-page-title");
-const bodyEl  = document.getElementById("preview-body");
+const titleEl    = document.getElementById("preview-page-title");
+const bodyEl     = document.getElementById("preview-body");
+const versionSel = document.getElementById("preview-version-select");
 
 titleEl.textContent = stem ? `${stem}.pdf` : "";
 document.title = stem ? `${stem} — Preview` : "DocuMentor — Preview";
 
 initTheme();
 
-async function load() {
+// Empty value = current on-disk content (may include unsaved/uncommitted
+// edits); any other value is a commit hash for a prior snapshot.
+async function loadVersions() {
+  try {
+    const res = await fetch(`/api/pdf/${encodeURIComponent(stem)}/versions`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const versions = await res.json();
+    if (versions.length === 0) {
+      versionSel.hidden = true;
+      return;
+    }
+
+    const latestOpt = document.createElement("option");
+    latestOpt.value = "";
+    latestOpt.textContent = "Latest";
+    versionSel.appendChild(latestOpt);
+
+    for (const v of versions) {
+      const opt = document.createElement("option");
+      opt.value = v.hash;
+      const date = new Date(v.date).toLocaleString(undefined, {
+        dateStyle: "medium", timeStyle: "short",
+      });
+      opt.textContent = `${date} — ${v.message}`;
+      versionSel.appendChild(opt);
+    }
+
+    versionSel.addEventListener("change", () => load(versionSel.value));
+  } catch (err) {
+    versionSel.hidden = true;
+  }
+}
+
+async function load(rev = "") {
   if (!stem) {
     bodyEl.innerHTML = '<div class="loading-placeholder">No document specified.</div>';
     return;
   }
   try {
-    const res = await fetch(`/api/pdf/${encodeURIComponent(stem)}/content`);
+    const path = rev
+      ? `/api/pdf/${encodeURIComponent(stem)}/content/${encodeURIComponent(rev)}`
+      : `/api/pdf/${encodeURIComponent(stem)}/content`;
+    const res = await fetch(path);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { content } = await res.json();
     render(content);
@@ -44,3 +81,4 @@ function render(markdownText) {
 }
 
 load();
+loadVersions();
