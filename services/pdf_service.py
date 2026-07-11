@@ -20,6 +20,7 @@ without parsing the document content.
 """
 
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -122,8 +123,33 @@ class PdfService:
 
     def save_markdown(self, stem: str, content: str) -> None:
         """Write the full markdown file, creating the output directory if needed."""
+        self._snapshot(f"Auto-snapshot before overwriting {stem}")
         out_dir = self.get_output_dir(stem)
         (out_dir / f"{stem}.md").write_text(content, encoding="utf-8")
+
+    def _snapshot(self, message: str) -> None:
+        """
+        Commit any pending edits in output/ before a scan overwrites them.
+
+        output/ is its own git repo, separate from the app repo, precisely so
+        hand-edited markdown survives a rescan. No-ops silently if output/
+        isn't a git repo (e.g. not yet initialised) or there's nothing to
+        commit — this is a safety net, not something that should ever block
+        a scan.
+        """
+        if not (ocr_core.OUTPUT_DIR / ".git").exists():
+            return
+        try:
+            subprocess.run(
+                ["git", "-C", str(ocr_core.OUTPUT_DIR), "add", "-A"],
+                check=True, capture_output=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(ocr_core.OUTPUT_DIR), "commit", "-m", message],
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError:
+            pass
 
     def update_page_in_markdown(
         self, stem: str, page_num: int, new_text: str

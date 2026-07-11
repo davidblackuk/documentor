@@ -57,3 +57,4 @@ preview/    ← temporary output from Test Scan (page-range previews)
 
 - Code pages (dense text, listings) sometimes trigger a repetition loop in the model, producing very long outputs. No mitigation is currently in place.
 - `glow` is an optional dependency for in-terminal Markdown preview — install with `sudo apt install glow`.
+- `astyle` is required for the web editor's "Code Block" C/C# reformatting (`services/format_service.py`) — install with `sudo apt install astyle`. BASIC and Z80/MC68000 assembler formatting are hand-rolled (no such formatter exists for either) and don't need it.
