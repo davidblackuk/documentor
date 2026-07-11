@@ -453,10 +453,12 @@ class PdfViewerPane {
   /**
    * @param {HTMLElement} container — the scrollable .pane-body div
    * @param {HTMLElement} indicator — the "p.N/total" label in the pane header
+   * @param {HTMLElement} [percentEl] — the "N%" scroll-position label, if present
    */
-  constructor(container, indicator) {
+  constructor(container, indicator, percentEl = null) {
     this._container  = container;
     this._indicator  = indicator;
+    this._percentEl  = percentEl;
     this._pdf        = null;      // loaded PDFDocumentProxy
     this._pageCount  = 0;
     this._rendered   = new Set(); // page numbers already drawn
@@ -522,6 +524,7 @@ class PdfViewerPane {
 
     // Scroll listener updates the page indicator as the user scrolls.
     this._container.addEventListener("scroll", () => this._updateIndicator(), { passive: true });
+    this._updateIndicator(); // show p.1 / 0% immediately, before any scroll fires
   }
 
   async _renderPage(pageNum, wrapper) {
@@ -554,6 +557,16 @@ class PdfViewerPane {
     if (visible) {
       this._indicator.textContent = `p.${visible} / ${this._pageCount}`;
     }
+    if (this._percentEl) {
+      this._percentEl.textContent = `${this._scrollPercent()}%`;
+    }
+  }
+
+  /** Percentage scrolled through the pane, 0 at the top and 100 at the bottom. */
+  _scrollPercent() {
+    const scrollable = this._container.scrollHeight - this._container.clientHeight;
+    if (scrollable <= 0) return 100;
+    return Math.round((this._container.scrollTop / scrollable) * 100);
   }
 
   // ── Scroll interface (used by SyncScroller) ───────────────────────────────
@@ -998,11 +1011,12 @@ class EditorView {
     this._previewBody     = document.getElementById("preview-body");
     this._pdfBody         = document.getElementById("pdf-body");
     this._pdfIndicator    = document.getElementById("pdf-page-indicator");
+    this._pdfPercent      = document.getElementById("pdf-scroll-percent");
 
     // Component instances — created once, reused across documents
     this._editorPane  = new MarkdownEditorPane(this._monacoContainer);
     this._previewPane = new PreviewPane(this._previewBody);
-    this._pdfPane     = new PdfViewerPane(this._pdfBody, this._pdfIndicator);
+    this._pdfPane     = new PdfViewerPane(this._pdfBody, this._pdfIndicator, this._pdfPercent);
     this._scroller    = null;   // created after Monaco is ready
 
     this._dirty          = false;

@@ -437,12 +437,28 @@ html, body {
 .btn-pane-move:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 .btn-pane-move:disabled             { opacity: 0.3; cursor: not-allowed; }
 
+.pdf-indicators {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .pdf-page-indicator {
   font-size: 11px;
   color: var(--text-dim);
   font-weight: normal;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.pdf-scroll-percent {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: normal;
+  letter-spacing: 0;
+  text-transform: none;
+  min-width: 32px;
+  text-align: right;
 }
 
 .pane-body {
