@@ -191,6 +191,12 @@ html, body {
   justify-content: space-between;
 }
 
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .section-title {
   font-size: 15px;
   font-weight: 600;
@@ -332,6 +338,7 @@ html, body {
 
 .save-status.dirty  { color: var(--warning); }
 .save-status.saved  { color: var(--success); }
+.save-status.error  { color: var(--danger); }
 
 .toggle-label {
   display: flex;

@@ -151,6 +151,39 @@ class PdfService:
         except subprocess.CalledProcessError:
             pass
 
+    def backup_output(self, message: str = "Manual save point") -> dict:
+        """
+        Commit any outstanding output/ changes and push them to its remote.
+
+        Unlike _snapshot (a silent safety net called on every write), this is
+        user-initiated from the dashboard's "Save Point" button, so failures
+        are raised rather than swallowed — the user is explicitly asking for
+        confirmation the push worked.
+        """
+        repo = ocr_core.OUTPUT_DIR
+        if not (repo / ".git").exists():
+            raise RuntimeError("output/ is not a git repository yet")
+
+        add = subprocess.run(
+            ["git", "-C", str(repo), "add", "-A"], capture_output=True, text=True,
+        )
+        if add.returncode != 0:
+            raise RuntimeError(add.stderr.strip() or "git add failed")
+
+        commit = subprocess.run(
+            ["git", "-C", str(repo), "commit", "-m", message],
+            capture_output=True, text=True,
+        )
+        committed = commit.returncode == 0
+
+        push = subprocess.run(
+            ["git", "-C", str(repo), "push"], capture_output=True, text=True,
+        )
+        if push.returncode != 0:
+            raise RuntimeError(push.stderr.strip() or "git push failed")
+
+        return {"committed": committed, "pushed": True}
+
     def update_page_in_markdown(
         self, stem: str, page_num: int, new_text: str
     ) -> str:

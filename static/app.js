@@ -89,6 +89,19 @@ class Api {
     return Api._post("/api/model/unload");
   }
 
+  // ── Output backup ─────────────────────────────────────────────────────────
+
+  /** Unlike Api._post, surfaces the server's {detail} message on failure
+   *  (e.g. a git push rejection) instead of a bare status code. */
+  static async saveOutputPoint() {
+    const r = await fetch("/api/output/save-point", { method: "POST" });
+    if (!r.ok) {
+      const body = await r.json().catch(() => null);
+      throw new Error(body?.detail || `Save point failed: ${r.status}`);
+    }
+    return r.json();
+  }
+
   // ── Scanner ───────────────────────────────────────────────────────────────
 
   /**
@@ -239,10 +252,13 @@ class DashboardView {
     this._progFraction = document.getElementById("progress-fraction");
     this._progFill     = document.getElementById("progress-bar-fill");
     this._logEl        = document.getElementById("scan-log");
+    this._btnSavePoint = document.getElementById("btn-save-point");
+    this._savePointStatus = document.getElementById("save-point-status");
 
     this._btnLoad.addEventListener("click",   () => this._loadModel());
     this._btnUnload.addEventListener("click", () => this._unloadModel());
     this._btnScan.addEventListener("click",   () => this._scanSelected());
+    this._btnSavePoint.addEventListener("click", () => this._saveOutputPoint());
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -286,6 +302,24 @@ class DashboardView {
     this._btnUnload.disabled = true;
     await Api.unloadModel();
     await this._refreshModelStatus();
+  }
+
+  // ── Output backup ─────────────────────────────────────────────────────────
+
+  async _saveOutputPoint() {
+    this._btnSavePoint.disabled = true;
+    this._savePointStatus.textContent = "Saving…";
+    this._savePointStatus.className = "save-status dirty";
+    try {
+      const { committed } = await Api.saveOutputPoint();
+      this._savePointStatus.textContent = committed ? "Saved ✓" : "Nothing to save";
+      this._savePointStatus.className = "save-status saved";
+    } catch (err) {
+      this._savePointStatus.textContent = err.message;
+      this._savePointStatus.className = "save-status error";
+    } finally {
+      this._btnSavePoint.disabled = false;
+    }
   }
 
   // ── PDF list ──────────────────────────────────────────────────────────────

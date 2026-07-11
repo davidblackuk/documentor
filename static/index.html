@@ -49,9 +49,16 @@
       <main class="dashboard-main">
         <div class="dashboard-toolbar">
           <h2 class="section-title">Documents</h2>
-          <button id="btn-scan-selected" class="btn btn-primary" disabled>
-            Scan Selected
-          </button>
+          <div class="toolbar-actions">
+            <span id="save-point-status" class="save-status"></span>
+            <button id="btn-save-point" class="btn btn-secondary"
+                    title="Commit and push output/ to its remote">
+              Save Point
+            </button>
+            <button id="btn-scan-selected" class="btn btn-primary" disabled>
+              Scan Selected
+            </button>
+          </div>
         </div>
 
         <div id="pdf-list" class="pdf-list">

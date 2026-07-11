@@ -20,7 +20,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import ocr_core
-from routers import formatting, model, pdfs, scanner
+from routers import backup, formatting, model, pdfs, scanner
 
 # ── Application ───────────────────────────────────────────────────────────────
 
@@ -71,10 +71,11 @@ async def canonicalize_host(request: Request, call_next):
 
 # ── API routers ───────────────────────────────────────────────────────────────
 
-app.include_router(pdfs.router,      prefix="/api")
-app.include_router(scanner.router,   prefix="/api")
-app.include_router(model.router,     prefix="/api")
+app.include_router(pdfs.router,       prefix="/api")
+app.include_router(scanner.router,    prefix="/api")
+app.include_router(model.router,      prefix="/api")
 app.include_router(formatting.router, prefix="/api")
+app.include_router(backup.router,     prefix="/api")
 
 # ── Static frontend ───────────────────────────────────────────────────────────
 
