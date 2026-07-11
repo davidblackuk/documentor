@@ -509,6 +509,43 @@ html, body {
   display: block;
 }
 
+/* ── Code block language picker ─────────────────────────────────────────── */
+
+.code-block-control { position: relative; }
+
+.code-lang-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  padding: 4px;
+}
+
+.code-lang-menu.hidden { display: none; }
+
+.code-lang-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.code-lang-option:hover { background: var(--bg-hover); }
+
 /* ── Rescan overlay ──────────────────────────────────────────────────────── */
 
 .rescan-overlay {

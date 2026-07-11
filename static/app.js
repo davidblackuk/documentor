@@ -53,6 +53,23 @@ class Api {
     return data.count;
   }
 
+  // ── Code formatting ───────────────────────────────────────────────────────
+
+  /** Unlike Api._post, surfaces the server's {detail} message on failure
+   *  (e.g. "astyle is not installed…") instead of a bare status code. */
+  static async formatCode(code, language) {
+    const r = await fetch("/api/format-code", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ code, language }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => null);
+      throw new Error(body?.detail || `Format request failed: ${r.status}`);
+    }
+    return r.json();
+  }
+
   // ── Model ─────────────────────────────────────────────────────────────────
 
   static async getModelStatus() {
@@ -692,6 +709,49 @@ class MarkdownEditorPane {
     return this._editor?.onDidScrollChange(fn);
   }
 
+  // ── Code block wrapping ─────────────────────────────────────────────────────
+
+  hasSelection() {
+    const sel = this._editor?.getSelection();
+    return !!sel && !sel.isEmpty();
+  }
+
+  getSelectedText() {
+    const sel = this._editor.getSelection();
+    return this._editor.getModel().getValueInRange(sel);
+  }
+
+  /**
+   * True if the current selection is already a fenced code block, or sits
+   * directly inside one (fence lines immediately before/after it).
+   */
+  isSelectionAlreadyFenced() {
+    const sel = this._editor?.getSelection();
+    if (!sel || sel.isEmpty()) return false;
+    const model = this._editor.getModel();
+
+    const text = model.getValueInRange(sel).trim();
+    if (text.length > 3 && text.startsWith("```") && text.endsWith("```")) return true;
+
+    const before = sel.startLineNumber > 1
+      ? model.getLineContent(sel.startLineNumber - 1).trim() : "";
+    const after = sel.endLineNumber < model.getLineCount()
+      ? model.getLineContent(sel.endLineNumber + 1).trim() : "";
+    return before.startsWith("```") && after.startsWith("```");
+  }
+
+  /** Replace the current selection with a ```language fenced block. */
+  wrapSelectionInFence(language, text) {
+    const sel = this._editor.getSelection();
+    const fenced = "```" + language + "\n" + text.replace(/\n+$/, "") + "\n```";
+    this._editor.executeEdits("wrap-code-fence", [{
+      range: sel,
+      text:  fenced,
+      forceMoveMarkers: true,
+    }]);
+    this._editor.focus();
+  }
+
   // ── Page detection ────────────────────────────────────────────────────────
 
   /**
@@ -891,6 +951,8 @@ class EditorView {
     this._btnBack      = document.getElementById("btn-back");
     this._btnSave      = document.getElementById("btn-save");
     this._btnRescan    = document.getElementById("btn-rescan-page");
+    this._btnCodeBlock = document.getElementById("btn-code-block");
+    this._codeLangMenu = document.getElementById("code-lang-menu");
     this._syncToggle        = document.getElementById("toggle-sync-scroll");
     this._editorFontSelect  = document.getElementById("editor-font-size");
     this._previewFontSelect = document.getElementById("preview-font-size");
@@ -1135,6 +1197,19 @@ class EditorView {
 
     this._btnRescan.addEventListener("click", () => this._rescanCurrentPage());
 
+    this._btnCodeBlock.addEventListener("click", () => this._onCodeBlockClick());
+    this._codeLangMenu.querySelectorAll(".code-lang-option").forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._codeLangMenu.classList.add("hidden");
+        this._wrapSelectionAsCode(btn.dataset.lang);
+      });
+    });
+    document.addEventListener("click", (e) => {
+      if (e.target !== this._btnCodeBlock && !this._codeLangMenu.contains(e.target)) {
+        this._codeLangMenu.classList.add("hidden");
+      }
+    });
+
     this._editorFontSelect.addEventListener("change", () => {
       this._editorPane.setFontSize(parseInt(this._editorFontSelect.value, 10));
       this._saveFontSizes(this._stem);
@@ -1170,6 +1245,33 @@ class EditorView {
   _setSaveStatus(text, modifier = "") {
     this._saveStatusEl.textContent  = text;
     this._saveStatusEl.className    = `save-status ${modifier}`;
+  }
+
+  // ── Code block wrapping ──────────────────────────────────────────────────
+
+  _onCodeBlockClick() {
+    if (!this._editorPane.hasSelection()) {
+      alert("Select the code you want to wrap first.");
+      return;
+    }
+    // Already fenced — leave it alone rather than double-wrapping.
+    if (this._editorPane.isSelectionAlreadyFenced()) return;
+
+    this._codeLangMenu.classList.toggle("hidden");
+  }
+
+  async _wrapSelectionAsCode(language) {
+    const original = this._editorPane.getSelectedText();
+    let text = original;
+    try {
+      const { formatted } = await Api.formatCode(original, language);
+      text = formatted;
+    } catch (err) {
+      alert(`Couldn't format the code, wrapping it as-is.\n\n${err.message}`);
+    }
+    this._editorPane.wrapSelectionInFence(language, text);
+    this._dirty = true;
+    this._setSaveStatus("Unsaved", "dirty");
   }
 
   // ── Rescan current page ───────────────────────────────────────────────────

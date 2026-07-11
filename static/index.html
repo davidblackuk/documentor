@@ -12,6 +12,9 @@
        href is swapped between the dark/light variant by the theme toggle. -->
   <link id="hljs-theme-link" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+  <!-- BASIC isn't in the core bundle above; loaded separately so ```basic fences highlight.
+       No grammar exists anywhere for Z80 or MC68000 assembly, so those render unstyled. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/languages/basic.min.js"></script>
 
   <!-- Split.js — drag-to-resize pane dividers (~2 KB) -->
   <script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
@@ -77,6 +80,16 @@
         <span id="editor-title" class="editor-title"></span>
         <div class="editor-header-actions">
           <span id="save-status" class="save-status"></span>
+          <div class="code-block-control">
+            <button id="btn-code-block" class="btn btn-secondary" title="Wrap the selected text in a formatted code block">{ } Code</button>
+            <div id="code-lang-menu" class="code-lang-menu hidden">
+              <button class="code-lang-option" data-lang="c">C</button>
+              <button class="code-lang-option" data-lang="csharp">C#</button>
+              <button class="code-lang-option" data-lang="basic">BASIC</button>
+              <button class="code-lang-option" data-lang="z80">Z80 Assembly</button>
+              <button class="code-lang-option" data-lang="m68k">MC68000 Assembly</button>
+            </div>
+          </div>
           <button id="btn-save"   class="btn btn-primary"  >Save</button>
           <button id="btn-rescan-page" class="btn btn-secondary">Rescan Page</button>
           <label class="toggle-label">
