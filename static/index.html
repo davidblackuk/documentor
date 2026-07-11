@@ -202,6 +202,18 @@
         <div class="rescan-spinner"></div>
         <span id="rescan-message" class="rescan-message">Rescanning page…</span>
       </div>
+
+      <!-- Unsaved-changes confirmation — shown when leaving the editor with pending edits -->
+      <div id="unsaved-overlay" class="confirm-overlay hidden">
+        <div class="confirm-box">
+          <p class="confirm-message">You have unsaved changes. Save before leaving?</p>
+          <div class="confirm-actions">
+            <button id="btn-unsaved-cancel"  class="btn btn-ghost">Cancel</button>
+            <button id="btn-unsaved-discard" class="btn btn-danger">Discard Changes</button>
+            <button id="btn-unsaved-save"    class="btn btn-primary">Save &amp; Exit</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

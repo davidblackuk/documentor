@@ -21,6 +21,24 @@
 
 import { initTheme } from "./theme.js";
 
+/**
+ * Distance from the top of `container`'s scrollable content to `el`, in the
+ * container's own scroll coordinate space.
+ *
+ * `el.offsetTop` is NOT this — it's relative to `el.offsetParent`, which
+ * (per spec) is the nearest *positioned* ancestor, not necessarily the
+ * nearest scrolling one. In the three-pane editor layout, none of the pane
+ * bodies are themselves positioned, so offsetTop resolves against
+ * `.editor-panes` further up the tree, baking in a constant offset (the
+ * pane header height, etc.) that made every sync-scroll target land short.
+ * getBoundingClientRect() deltas are immune to that, since they're always
+ * viewport-relative regardless of the positioned-ancestor chain.
+ */
+function offsetTopWithin(el, container) {
+  return el.getBoundingClientRect().top - container.getBoundingClientRect().top
+    + container.scrollTop;
+}
+
 // ============================================================================
 // SECTION 1: API CLIENT
 // All server communication in one place. Routes are string constants to avoid
@@ -579,7 +597,7 @@ class PdfViewerPane {
   /** Scroll so that page N is flush with the top of the viewport. */
   setPage(n) {
     const wrapper = this._container.querySelector(`[data-page="${n}"]`);
-    if (wrapper) this._container.scrollTop = wrapper.offsetTop;
+    if (wrapper) this._container.scrollTop = offsetTopWithin(wrapper, this._container);
   }
 
   onScroll(fn) {
@@ -595,7 +613,7 @@ class PdfViewerPane {
     let minDist = Infinity;
 
     for (const el of wrappers) {
-      const mid  = el.offsetTop + el.offsetHeight / 2;
+      const mid  = offsetTopWithin(el, this._container) + el.offsetHeight / 2;
       const dist = Math.abs(mid - center);
       if (dist < minDist) {
         minDist = dist;
@@ -888,7 +906,7 @@ class PreviewPane {
     let   page = 1;
     this._body.querySelectorAll(".page-anchor[id^='pg']").forEach(el => {
       const n = parseInt(el.id.slice(2), 10);
-      if (!isNaN(n) && el.offsetTop <= top) page = n;
+      if (!isNaN(n) && offsetTopWithin(el, this._body) <= top) page = n;
     });
     return page;
   }
@@ -896,7 +914,7 @@ class PreviewPane {
   /** Scroll preview so that the page N anchor is at the top of the viewport. */
   setPage(n) {
     const anchor = this._body.querySelector(`[id="pg${n}"]`);
-    if (anchor) this._body.scrollTop = anchor.offsetTop;
+    if (anchor) this._body.scrollTop = offsetTopWithin(anchor, this._body);
   }
 
   onScroll(fn) {
@@ -1005,6 +1023,10 @@ class EditorView {
     this._previewFontSelect = document.getElementById("preview-font-size");
     this._overlay      = document.getElementById("rescan-overlay");
     this._overlayMsg   = document.getElementById("rescan-message");
+    this._unsavedOverlay = document.getElementById("unsaved-overlay");
+    this._btnUnsavedCancel  = document.getElementById("btn-unsaved-cancel");
+    this._btnUnsavedDiscard = document.getElementById("btn-unsaved-discard");
+    this._btnUnsavedSave    = document.getElementById("btn-unsaved-save");
 
     // Pane elements
     this._monacoContainer = document.getElementById("monaco-container");
@@ -1020,6 +1042,7 @@ class EditorView {
     this._scroller    = null;   // created after Monaco is ready
 
     this._dirty          = false;
+    this._baseTitle      = document.title; // restored when the star is cleared
     this._monacoReady    = false;
     this._splitInstance  = null;
     this._savePageTimer  = null;
@@ -1130,8 +1153,6 @@ class EditorView {
    */
   async open(stem) {
     this._stem  = stem;
-    this._dirty = false;
-    this._setSaveStatus("");
 
     this._titleEl.textContent = `${stem}.pdf`;
 
@@ -1151,6 +1172,14 @@ class EditorView {
     } else {
       this._editorPane.setValue(markdown);
     }
+
+    // setValue() (and, on some Monaco versions, init()) fires the same
+    // onDidChangeModelContent event a real user edit would, which the
+    // dirty-tracking listener in _wireEditorEvents() can't tell apart from
+    // an actual edit. Reset dirty state after loading, not before, so
+    // opening/switching documents never starts the editor in a dirty state.
+    this._setDirty(false);
+    this._setSaveStatus("");
 
     // Render initial preview
     this._previewPane.update(markdown, stem);
@@ -1218,7 +1247,7 @@ class EditorView {
 
   _wireEditorEvents() {
     this._editorPane.onChange(() => {
-      this._dirty = true;
+      this._setDirty(true);
       this._setSaveStatus("Unsaved", "dirty");
       this._previewPane.update(this._editorPane.getValue());
     });
@@ -1237,8 +1266,42 @@ class EditorView {
   // ── Toolbar ───────────────────────────────────────────────────────────────
 
   _wireToolbar() {
-    this._btnBack.addEventListener("click", () => {
+    this._btnBack.addEventListener("click", () => this._onBackClicked());
+
+    this._btnUnsavedCancel.addEventListener("click", () => this._hideUnsavedPrompt());
+    this._btnUnsavedDiscard.addEventListener("click", () => {
+      this._hideUnsavedPrompt();
+      this._setDirty(false);
       this._bus.emit("back-to-dashboard");
+    });
+    this._btnUnsavedSave.addEventListener("click", async () => {
+      const saved = await this._save();
+      if (!saved) return; // leave the prompt open so the user can retry or discard
+      this._hideUnsavedPrompt();
+      this._bus.emit("back-to-dashboard");
+    });
+    // Clicking the dimmed backdrop (not the dialog box itself) cancels, same as the Cancel button.
+    this._unsavedOverlay.addEventListener("click", (e) => {
+      if (e.target === this._unsavedOverlay) this._hideUnsavedPrompt();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !this._unsavedOverlay.classList.contains("hidden")) {
+        this._hideUnsavedPrompt();
+      }
+    });
+
+    // The app never pushes browser history entries — view switches are just
+    // in-page class toggles — so the Back/Forward buttons don't hit our own
+    // "leave with unsaved changes?" prompt at all; they navigate the tab
+    // itself away from the app. beforeunload is the only hook that covers
+    // that (and also tab close / reload / typing a new URL) with a native
+    // browser-level confirmation. Custom text in returnValue is ignored by
+    // modern browsers, which always show their own generic wording — the
+    // assignment is just what triggers the dialog to appear at all.
+    window.addEventListener("beforeunload", (e) => {
+      if (!this._dirty) return;
+      e.preventDefault();
+      e.returnValue = "";
     });
 
     this._btnSave.addEventListener("click", () => this._save());
@@ -1277,22 +1340,47 @@ class EditorView {
     });
   }
 
+  /** Returns true on success, false on failure — callers that gate further
+   *  actions (like leaving the editor) on a successful save check this. */
   async _save() {
-    if (!this._stem) return;
+    if (!this._stem) return false;
     this._setSaveStatus("Saving…");
     try {
       await Api.saveMarkdown(this._stem, this._editorPane.getValue());
-      this._dirty = false;
+      this._setDirty(false);
       this._setSaveStatus("Saved", "saved");
       setTimeout(() => this._setSaveStatus(""), 2000);
+      return true;
     } catch {
       this._setSaveStatus("Save failed", "dirty");
+      return false;
     }
+  }
+
+  // ── Unsaved-changes prompt (shown when leaving the editor with pending edits) ──
+
+  _onBackClicked() {
+    if (this._dirty) {
+      this._unsavedOverlay.classList.remove("hidden");
+    } else {
+      this._bus.emit("back-to-dashboard");
+    }
+  }
+
+  _hideUnsavedPrompt() {
+    this._unsavedOverlay.classList.add("hidden");
   }
 
   _setSaveStatus(text, modifier = "") {
     this._saveStatusEl.textContent  = text;
     this._saveStatusEl.className    = `save-status ${modifier}`;
+  }
+
+  /** Tracks unsaved changes and mirrors them onto the tab title (a leading
+   *  star) so they're visible even when this tab isn't focused. */
+  _setDirty(value) {
+    this._dirty = value;
+    document.title = value ? `★ ${this._baseTitle}` : this._baseTitle;
   }
 
   // ── Code block wrapping ──────────────────────────────────────────────────
@@ -1318,7 +1406,7 @@ class EditorView {
       alert(`Couldn't format the code, wrapping it as-is.\n\n${err.message}`);
     }
     this._editorPane.wrapSelectionInFence(language, text);
-    this._dirty = true;
+    this._setDirty(true);
     this._setSaveStatus("Unsaved", "dirty");
   }
 
@@ -1346,7 +1434,7 @@ class EditorView {
       const updated = await Api.getMarkdown(this._stem);
       this._editorPane.setValue(updated);
       this._previewPane.update(updated);
-      this._dirty = false;
+      this._setDirty(false);
       this._setSaveStatus("Saved", "saved");
       setTimeout(() => this._setSaveStatus(""), 2000);
 

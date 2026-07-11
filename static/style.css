@@ -601,6 +601,44 @@ html, body {
   color: var(--text-secondary);
 }
 
+/* ── Unsaved-changes confirmation ───────────────────────────────────────── */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+.confirm-overlay.hidden { display: none; }
+
+.confirm-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  padding: 20px 24px;
+  max-width: 360px;
+}
+
+.confirm-message {
+  font-size: 14px;
+  color: var(--text-primary);
+  margin: 0 0 16px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { filter: brightness(1.1); }
+
 /* ── Utility ─────────────────────────────────────────────────────────────── */
 
 .hidden    { display: none !important; }
