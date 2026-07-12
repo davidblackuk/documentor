@@ -1338,6 +1338,23 @@ class EditorView {
         this._save();
       }
     });
+
+    // Ctrl+Shift+C / Cmd+Shift+C — wrap selection as C.
+    // Ctrl+Shift+B / Cmd+Shift+B — wrap selection as BASIC.
+    // Note: Ctrl+Shift+C is also Chrome DevTools' inspect-element shortcut;
+    // since that's a browser-level binding, it may win over this handler
+    // depending on browser/OS.
+    document.addEventListener("keydown", (e) => {
+      if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "c") {
+        e.preventDefault();
+        this._onCodeShortcut("c");
+      } else if (key === "b") {
+        e.preventDefault();
+        this._onCodeShortcut("basic");
+      }
+    });
   }
 
   /** Returns true on success, false on failure — callers that gate further
@@ -1386,14 +1403,26 @@ class EditorView {
   // ── Code block wrapping ──────────────────────────────────────────────────
 
   _onCodeBlockClick() {
+    if (!this._canWrapSelection()) return;
+    this._codeLangMenu.classList.toggle("hidden");
+  }
+
+  /** Ctrl/Cmd+Shift+C and +B — wrap the selection directly in the given
+   *  language, skipping the { } Code dropdown. */
+  _onCodeShortcut(language) {
+    if (!this._canWrapSelection()) return;
+    this._codeLangMenu.classList.add("hidden");
+    this._wrapSelectionAsCode(language);
+  }
+
+  _canWrapSelection() {
     if (!this._editorPane.hasSelection()) {
       alert("Select the code you want to wrap first.");
-      return;
+      return false;
     }
     // Already fenced — leave it alone rather than double-wrapping.
-    if (this._editorPane.isSelectionAlreadyFenced()) return;
-
-    this._codeLangMenu.classList.toggle("hidden");
+    if (this._editorPane.isSelectionAlreadyFenced()) return false;
+    return true;
   }
 
   async _wrapSelectionAsCode(language) {
