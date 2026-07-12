@@ -401,13 +401,13 @@ class DashboardView {
         <span class="pdf-name" title="${p.filename}">${p.filename}</span>
         <span class="pdf-pages">${p.page_count} pp</span>
         <span class="status-badge status-${p.status}">${p.status}</span>
-        <a class="btn btn-secondary btn-edit"
-           href="/pdf-view.html?stem=${encodeURIComponent(p.stem)}">PDF</a>
-        ${p.status === "scanned" ? `
+        <div class="pdf-actions">
           <a class="btn btn-secondary btn-edit"
+             href="/pdf-view.html?stem=${encodeURIComponent(p.stem)}">PDF</a>
+          <a class="btn btn-secondary btn-edit${p.status === "scanned" ? "" : " btn-invisible"}"
              href="/preview.html?stem=${encodeURIComponent(p.stem)}">Markdown</a>
-        ` : ""}
-        <button class="btn btn-secondary btn-edit" data-stem="${p.stem}">Edit</button>
+          <button class="btn btn-secondary btn-edit" data-stem="${p.stem}">Edit</button>
+        </div>
       </div>
     `).join("");
 

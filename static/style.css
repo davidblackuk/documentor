@@ -259,10 +259,25 @@ html, body {
 .status-cancelled { background: rgba(244,71,71,0.15);   color: var(--danger); }
 .status-pending   { background: rgba(100,100,100,0.15); color: var(--text-dim); }
 
+.pdf-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 210px;
+  flex-shrink: 0;
+}
+
 .btn-edit {
   font-size: 12px;
   padding: 3px 10px;
   flex-shrink: 0;
+}
+
+/* Reserves the Markdown button's slot so PDF/Edit stay in a fixed
+   position whether or not it applies to this row. */
+.btn-invisible {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* ── Dashboard: scan progress ────────────────────────────────────────────── */
