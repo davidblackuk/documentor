@@ -7,6 +7,7 @@ references to match the blog's asset layout. Pulled forward from the
 original terminal UI's action_publish_to_blog (documenter.py, pre-web-app).
 """
 
+import re
 import shutil
 from datetime import date
 from pathlib import Path
@@ -41,6 +42,16 @@ class BlogService:
 
         if dest_md.exists() and not overwrite:
             raise FileExistsError(f"Post already exists: {dest_md.name}")
+
+        # Republishing on a later date would otherwise leave the previous
+        # dated post behind (the exists-check above only catches same-day
+        # collisions) — remove any other dated post for this same document
+        # so the blog only ever keeps the latest publish.
+        stale_pattern = re.compile(rf"^\d{{4}}-\d{{2}}-\d{{2}}-{re.escape(slug)}\.md$")
+        if BLOG_POSTS_DIR.is_dir():
+            for existing in BLOG_POSTS_DIR.iterdir():
+                if existing != dest_md and stale_pattern.match(existing.name):
+                    existing.unlink()
 
         src_images   = ocr_core.OUTPUT_DIR / stem / "images"
         copied_images = 0
