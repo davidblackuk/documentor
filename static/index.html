@@ -68,8 +68,11 @@
         <!-- Scan progress panel — hidden until a scan starts -->
         <div id="scan-progress-panel" class="scan-progress-panel hidden">
           <div class="progress-header">
-            <span id="progress-filename" class="progress-filename"></span>
-            <span id="progress-fraction" class="progress-fraction"></span>
+            <div class="progress-info">
+              <span id="progress-filename" class="progress-filename"></span>
+              <span id="progress-fraction" class="progress-fraction"></span>
+            </div>
+            <button id="btn-cancel-scan" class="btn btn-danger" disabled>Cancel</button>
           </div>
           <div class="progress-bar-track">
             <div id="progress-bar-fill" class="progress-bar-fill" style="width:0%"></div>

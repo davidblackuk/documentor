@@ -17,7 +17,7 @@ Public surface
   slugify()          — shared text utility
 """
 
-import io, os, re, shutil, tempfile, warnings
+import io, os, re, shutil, tempfile, threading, warnings
 from contextlib import redirect_stdout, redirect_stderr
 from dataclasses import dataclass
 from pathlib import Path
@@ -55,10 +55,11 @@ class ScanEvent:
     event_type values
     -----------------
     "log"   — informational message (no page context)
-    "start" — scan is starting; total is set
-    "page"  — one page finished; page and total are set
-    "done"  — scan complete
-    "error" — a page failed; page is set, message has the reason
+    "start"     — scan is starting; total is set
+    "page"      — one page finished; page and total are set
+    "done"      — scan complete
+    "error"     — a page failed; page is set, message has the reason
+    "cancelled" — scan was stopped early by request; page/total reflect progress so far
     """
     event_type: str
     message: str
@@ -225,6 +226,7 @@ def process_pdf(
     page_start: int = 1,
     page_end: int | None = None,
     on_progress: ProgressCallback = _noop,
+    cancel_event: threading.Event | None = None,
 ) -> tuple[list[str], int]:
     """
     Render a PDF page-range to PNGs and OCR each page sequentially.
@@ -236,6 +238,12 @@ def process_pdf(
 
     A partial file (<stem>.partial.md) is written after every page so the
     scan can be inspected mid-run and resumed manually after a crash.
+
+    If cancel_event is set between pages, the scan stops before starting
+    the next page (an in-flight page's OCR always runs to completion —
+    interrupting a model.infer() call mid-generation isn't safe), emits a
+    "cancelled" event instead of "done", and leaves the partial file in
+    place rather than deleting it.
     """
     if _model is None:
         raise RuntimeError("Model not loaded — call load_model() first")
@@ -268,7 +276,12 @@ def process_pdf(
         doc.close()
 
         # ── Phase 2: OCR each page (slow, GPU-bound) ──────────────────────────
+        cancelled = False
         for page_num, img_path in page_imgs:
+            if cancel_event is not None and cancel_event.is_set():
+                cancelled = True
+                break
+
             page_tmp = tmp / f"ocr_{page_num:04d}"
             try:
                 text, img_counter = _ocr_page(
@@ -293,6 +306,17 @@ def process_pdf(
                 page=page_num,
                 total=len(pages),
             ))
+
+    if cancelled:
+        # Leave the partial file in place — it reflects real progress made
+        # before the cancel request landed.
+        on_progress(ScanEvent(
+            "cancelled",
+            f"Cancelled after {len(sections)} of {len(pages)} pages",
+            page=len(sections),
+            total=len(pages),
+        ))
+        return sections, img_counter
 
     # Clean up the partial file now that the full scan succeeded.
     if partial_md.exists():

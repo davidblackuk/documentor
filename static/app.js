@@ -157,6 +157,11 @@ class Api {
     return Api._sseStream(url, onEvent, onDone);
   }
 
+  /** Request cancellation of the in-progress scan for `stem`. */
+  static async cancelScan(stem) {
+    return Api._post(`/api/pdf/${encodeURIComponent(stem)}/scan/cancel`);
+  }
+
   /**
    * Rescan a single page via fetch + ReadableStream (not EventSource, because
    * we need to read the final response after the SSE messages end).
@@ -205,8 +210,11 @@ class Api {
       try {
         const data = JSON.parse(e.data);
         onEvent(data);
-        // Terminal events signal the server has closed its end.
-        if (data.type === "done" || data.type === "error") {
+        // Terminal events signal the server has closed its end. A per-page
+        // "error" (data.page is set) is NOT terminal — the scan continues
+        // to the next page — only a fatal top-level error (no page) is.
+        const isFatalError = data.type === "error" && data.page == null;
+        if (data.type === "done" || data.type === "cancelled" || isFatalError) {
           es.close();
           onDone?.();
         }
@@ -287,6 +295,7 @@ class DashboardView {
     this._btnLoad      = document.getElementById("btn-load-model");
     this._btnUnload    = document.getElementById("btn-unload-model");
     this._btnScan      = document.getElementById("btn-scan-selected");
+    this._btnCancelScan= document.getElementById("btn-cancel-scan");
     this._progressPanel= document.getElementById("scan-progress-panel");
     this._progFilename = document.getElementById("progress-filename");
     this._progFraction = document.getElementById("progress-fraction");
@@ -295,9 +304,14 @@ class DashboardView {
     this._btnSavePoint = document.getElementById("btn-save-point");
     this._savePointStatus = document.getElementById("save-point-status");
 
+    // Set while a scan is streaming so the Cancel button knows which
+    // document to target; cleared when the stream ends (done/cancelled/error).
+    this._currentScanStem = null;
+
     this._btnLoad.addEventListener("click",   () => this._loadModel());
     this._btnUnload.addEventListener("click", () => this._unloadModel());
     this._btnScan.addEventListener("click",   () => this._scanSelected());
+    this._btnCancelScan.addEventListener("click", () => this._cancelCurrentScan());
     this._btnSavePoint.addEventListener("click", () => this._saveOutputPoint());
   }
 
@@ -432,7 +446,8 @@ class DashboardView {
     this._showProgressPanel();
 
     for (const stem of stems) {
-      await this._scanOne(stem);
+      const cancelled = await this._scanOne(stem);
+      if (cancelled) break;   // stop the whole batch, not just this document
     }
 
     this._hideProgressPanel();
@@ -440,25 +455,49 @@ class DashboardView {
     this._btnScan.disabled = false;
   }
 
+  /** Scan one document; resolves to true if the scan was cancelled. */
   _scanOne(stem) {
     return new Promise(resolve => {
       this._progFilename.textContent = stem;
       this._progFraction.textContent = "";
       this._progFill.style.width = "0%";
 
+      this._currentScanStem  = stem;
+      this._btnCancelScan.disabled = false;
+
+      let cancelled = false;
+
       Api.scanPdfStream(
         stem, 1, 0,   // 0 = scan all pages
         (data) => {
           this._appendLog(data.message);
+          if (data.type === "cancelled") cancelled = true;
           if (data.type === "page" && data.total) {
             const pct = Math.round((data.page / data.total) * 100);
             this._progFill.style.width = `${pct}%`;
             this._progFraction.textContent = `${data.page} / ${data.total}`;
           }
         },
-        resolve,
+        () => {
+          this._currentScanStem  = null;
+          this._btnCancelScan.disabled = true;
+          resolve(cancelled);
+        },
       );
     });
+  }
+
+  /** Ask the server to stop the currently streaming scan at the next page. */
+  async _cancelCurrentScan() {
+    if (!this._currentScanStem) return;
+    this._btnCancelScan.disabled = true;
+    this._appendLog("Cancelling…");
+    try {
+      await Api.cancelScan(this._currentScanStem);
+    } catch (err) {
+      this._appendLog(`Cancel request failed: ${err.message}`);
+      this._btnCancelScan.disabled = false;
+    }
   }
 
   // ── Progress panel helpers ─────────────────────────────────────────────────

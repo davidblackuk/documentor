@@ -49,6 +49,22 @@ async def scan_pdf(
     )
 
 
+@router.post("/pdf/{stem}/scan/cancel")
+def cancel_scan(
+    stem: str,
+    svc: OcrService = Depends(get_ocr_service),
+):
+    """
+    Request cancellation of the in-progress scan for this document.
+
+    Takes effect at the next page boundary (an in-flight page's OCR always
+    finishes) and marks the document's status as "cancelled" once the scan
+    stream observes the stop.
+    """
+    cancelled = svc.cancel_scan(stem)
+    return {"cancelled": cancelled}
+
+
 @router.get("/pdf/{stem}/rescan/{page}")
 async def rescan_page(
     stem: str,

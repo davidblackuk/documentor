@@ -254,9 +254,10 @@ html, body {
   text-align: center;
 }
 
-.status-scanned { background: rgba(78,201,176,0.15); color: var(--success); }
-.status-partial { background: rgba(220,220,170,0.15); color: var(--warning); }
-.status-pending { background: rgba(100,100,100,0.15); color: var(--text-dim); }
+.status-scanned   { background: rgba(78,201,176,0.15); color: var(--success); }
+.status-partial   { background: rgba(220,220,170,0.15); color: var(--warning); }
+.status-cancelled { background: rgba(244,71,71,0.15);   color: var(--danger); }
+.status-pending   { background: rgba(100,100,100,0.15); color: var(--text-dim); }
 
 .btn-edit {
   font-size: 12px;
@@ -279,9 +280,12 @@ html, body {
 .progress-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
   font-size: 13px;
 }
+
+.progress-info { display: flex; gap: 10px; align-items: baseline; }
 
 .progress-filename { color: var(--text-primary); font-weight: 500; }
 .progress-fraction { color: var(--text-secondary); }

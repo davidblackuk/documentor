@@ -38,9 +38,10 @@ class PdfInfo:
 
     status values
     -------------
-    "scanned"    — output/<stem>/<stem>.md exists and is non-empty
-    "partial"    — a .partial.md exists (scan in progress or interrupted)
-    "pending"    — no output yet
+    "scanned"   — output/<stem>/<stem>.md exists and is non-empty
+    "cancelled" — a scan was stopped by request; partial progress is kept
+    "partial"   — a .partial.md exists (scan in progress or interrupted)
+    "pending"   — no output yet
     """
     stem: str          # filename without extension, used as the document ID
     filename: str      # original filename with .pdf
@@ -67,9 +68,12 @@ class PdfService:
             stem       = pdf_path.stem
             md_path    = ocr_core.OUTPUT_DIR / stem / f"{stem}.md"
             partial    = ocr_core.OUTPUT_DIR / stem / f"{stem}.partial.md"
+            cancelled  = ocr_core.OUTPUT_DIR / stem / ".cancelled"
 
             if md_path.exists() and md_path.stat().st_size > 0:
                 status = "scanned"
+            elif cancelled.exists():
+                status = "cancelled"
             elif partial.exists():
                 status = "partial"
             else:
@@ -126,6 +130,16 @@ class PdfService:
         self._snapshot(f"Auto-snapshot before overwriting {stem}")
         out_dir = self.get_output_dir(stem)
         (out_dir / f"{stem}.md").write_text(content, encoding="utf-8")
+
+    def mark_cancelled(self, stem: str) -> None:
+        """Flag a document as cancelled so list_pdfs reports it distinctly from 'partial'."""
+        out_dir = self.get_output_dir(stem)
+        (out_dir / ".cancelled").touch()
+
+    def clear_cancelled(self, stem: str) -> None:
+        """Remove the cancelled marker, e.g. when a fresh scan starts."""
+        marker = ocr_core.OUTPUT_DIR / stem / ".cancelled"
+        marker.unlink(missing_ok=True)
 
     def _snapshot(self, message: str) -> None:
         """

@@ -23,6 +23,7 @@ The double newline terminates the SSE message per the spec.
 
 import asyncio
 import json
+import threading
 from typing import AsyncGenerator
 
 import ocr_core
@@ -63,6 +64,25 @@ class OcrService:
         self._pdf    = pdf_service
         self._lock   = asyncio.Lock()   # one scan at a time
 
+        # Set while a full-document scan (stream_scan) is running so
+        # cancel_scan() can signal it to stop at the next page boundary.
+        self._cancel_event: threading.Event | None = None
+        self._scanning_stem: str | None = None
+
+    def cancel_scan(self, stem: str) -> bool:
+        """
+        Request cancellation of the in-progress scan for `stem`.
+
+        Returns True if a matching scan was found and signalled, False if
+        no scan for this document is currently running. Cancellation is
+        cooperative: it takes effect before the next page starts, not
+        mid-page, since interrupting model.infer() mid-generation isn't safe.
+        """
+        if self._scanning_stem == stem and self._cancel_event is not None:
+            self._cancel_event.set()
+            return True
+        return False
+
     # ── Full document scan ────────────────────────────────────────────────────
 
     async def stream_scan(
@@ -78,7 +98,11 @@ class OcrService:
         remains responsive.  A shared asyncio.Queue bridges the worker thread
         and this async generator.
 
-        Yields SSE strings until a "done" or "error" event terminates the scan.
+        Yields SSE strings until a "done", "cancelled", or fatal "error"
+        event terminates the scan. A per-page "error" (page is set) does
+        NOT terminate the scan — process_pdf keeps going to the next page —
+        so only a top-level "error" (page is None, meaning the whole
+        executor call raised) breaks the relay loop early.
         """
         if self._lock.locked():
             yield _sse_error("A scan is already in progress")
@@ -96,6 +120,11 @@ class OcrService:
                 yield _sse_error(str(exc))
                 return
 
+            self._pdf.clear_cancelled(stem)
+            cancel_event = threading.Event()
+            self._cancel_event  = cancel_event
+            self._scanning_stem = stem
+
             queue: asyncio.Queue[ScanEvent] = asyncio.Queue()
             loop = asyncio.get_event_loop()
 
@@ -112,6 +141,7 @@ class OcrService:
                         page_start=page_start,
                         page_end=page_end,
                         on_progress=on_progress,
+                        cancel_event=cancel_event,
                     )
                 except Exception as exc:
                     # Forward the real error message rather than a generic sentinel.
@@ -120,24 +150,35 @@ class OcrService:
                     )
                     return exc
 
-            # Start the blocking work in the thread pool.
-            future = loop.run_in_executor(None, run_scan)
+            try:
+                # Start the blocking work in the thread pool.
+                future = loop.run_in_executor(None, run_scan)
 
-            # Relay events from the queue until the scan signals completion.
-            while True:
-                event = await queue.get()
-                yield _sse(event)
-                if event.event_type in ("done", "error"):
-                    break
+                # Relay events from the queue until the scan signals completion.
+                # A per-page error (page is set) is non-fatal — process_pdf
+                # continues to the next page — so it doesn't break the loop.
+                while True:
+                    event = await queue.get()
+                    yield _sse(event)
+                    if event.event_type in ("done", "cancelled"):
+                        break
+                    if event.event_type == "error" and event.page is None:
+                        break
 
-            # Await the executor future to propagate any unhandled exceptions.
-            result = await future
-            if isinstance(result, Exception):
-                return
+                # Await the executor future to propagate any unhandled exceptions.
+                result = await future
+                if isinstance(result, Exception):
+                    return
 
-            # Persist the final markdown now that all pages are complete.
-            sections, _ = result
-            self._pdf.save_markdown(stem, "\n\n---\n\n".join(sections))
+                sections, _ = result
+                if event.event_type == "cancelled":
+                    self._pdf.mark_cancelled(stem)
+                else:
+                    # Persist the final markdown now that all pages are complete.
+                    self._pdf.save_markdown(stem, "\n\n---\n\n".join(sections))
+            finally:
+                self._cancel_event  = None
+                self._scanning_stem = None
 
     # ── Single-page rescan ────────────────────────────────────────────────────
 
