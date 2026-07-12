@@ -57,7 +57,7 @@ class BlogService:
             f'---\n'
             f'layout: post\n'
             f'title: "{stem}"\n'
-            f'tags: [atari, atari-scanned-doc]\n'
+            f'tags: [atari, atari-scanned-doc, retro]\n'
             f'description: "Scanned and OCR\'d: {stem}"\n'
             f'date: {post_date}\n'
             f'---\n\n'
