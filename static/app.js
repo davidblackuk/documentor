@@ -71,6 +71,28 @@ class Api {
     return data.count;
   }
 
+  // ── Blog publishing ───────────────────────────────────────────────────────
+
+  /**
+   * Copy a document's markdown + images into the blog repo as a post.
+   * Throws on failure; a 409 (post already exists) is surfaced via
+   * err.isConflict so the caller can offer to overwrite.
+   */
+  static async publishToBlog(stem, { overwrite = false } = {}) {
+    const r = await fetch(`/api/pdf/${encodeURIComponent(stem)}/publish`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ overwrite }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => null);
+      const err = new Error(body?.detail || `Publish failed: ${r.status}`);
+      err.isConflict = r.status === 409;
+      throw err;
+    }
+    return r.json();
+  }
+
   // ── Code formatting ───────────────────────────────────────────────────────
 
   /** Unlike Api._post, surfaces the server's {detail} message on failure
@@ -1015,6 +1037,8 @@ class EditorView {
     this._saveStatusEl = document.getElementById("save-status");
     this._btnBack      = document.getElementById("btn-back");
     this._btnSave      = document.getElementById("btn-save");
+    this._btnPublish     = document.getElementById("btn-publish-blog");
+    this._publishStatusEl = document.getElementById("publish-status");
     this._btnRescan    = document.getElementById("btn-rescan-page");
     this._btnCodeBlock = document.getElementById("btn-code-block");
     this._codeLangMenu = document.getElementById("code-lang-menu");
@@ -1306,6 +1330,8 @@ class EditorView {
 
     this._btnSave.addEventListener("click", () => this._save());
 
+    this._btnPublish.addEventListener("click", () => this._publishToBlog());
+
     this._btnRescan.addEventListener("click", () => this._rescanCurrentPage());
 
     this._btnCodeBlock.addEventListener("click", () => this._onCodeBlockClick());
@@ -1371,6 +1397,42 @@ class EditorView {
     } catch {
       this._setSaveStatus("Save failed", "dirty");
       return false;
+    }
+  }
+
+  // ── Blog publishing ───────────────────────────────────────────────────────
+
+  /** Publishes the current document; on a 409 (post already exists for
+   *  today) asks the user whether to overwrite it before retrying. */
+  async _publishToBlog() {
+    if (!this._stem) return;
+    this._btnPublish.disabled = true;
+    this._publishStatusEl.textContent = "Publishing…";
+    this._publishStatusEl.className   = "save-status dirty";
+    try {
+      await Api.publishToBlog(this._stem);
+      this._publishStatusEl.textContent = "Published ✓";
+      this._publishStatusEl.className   = "save-status saved";
+      setTimeout(() => { this._publishStatusEl.textContent = ""; }, 2000);
+    } catch (err) {
+      if (err.isConflict && confirm(`${err.message}\n\nOverwrite it?`)) {
+        try {
+          await Api.publishToBlog(this._stem, { overwrite: true });
+          this._publishStatusEl.textContent = "Published ✓";
+          this._publishStatusEl.className   = "save-status saved";
+          setTimeout(() => { this._publishStatusEl.textContent = ""; }, 2000);
+        } catch (err2) {
+          this._publishStatusEl.textContent = err2.message;
+          this._publishStatusEl.className   = "save-status error";
+        }
+      } else if (!err.isConflict) {
+        this._publishStatusEl.textContent = err.message;
+        this._publishStatusEl.className   = "save-status error";
+      } else {
+        this._publishStatusEl.textContent = "";
+      }
+    } finally {
+      this._btnPublish.disabled = false;
     }
   }
 

@@ -10,7 +10,6 @@ For the full web UI, run start.sh (or: uvicorn server:app) instead.
 """
 
 import shutil, subprocess, sys
-from pathlib import Path
 
 from rich import box
 from rich.console import Console
@@ -30,10 +29,6 @@ from ocr_core import (  # noqa: F401
 )
 
 console = Console()
-
-BLOG_DIR        = Path("/home/davidb/Documents/Git/davidblackuk.github.io")
-BLOG_POSTS_DIR  = BLOG_DIR / "_posts"
-BLOG_IMAGES_DIR = BLOG_DIR / "images" / "atari"
 
 MODELS = {
     "deepseek": {"name": "DeepSeek-OCR", "installed": DEEPSEEK_PATH.exists()},

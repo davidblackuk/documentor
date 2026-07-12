@@ -20,7 +20,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import ocr_core
-from routers import backup, formatting, model, pdfs, scanner
+from routers import backup, blog, formatting, model, pdfs, scanner
 
 # ── Application ───────────────────────────────────────────────────────────────
 
@@ -76,6 +76,7 @@ app.include_router(scanner.router,    prefix="/api")
 app.include_router(model.router,      prefix="/api")
 app.include_router(formatting.router, prefix="/api")
 app.include_router(backup.router,     prefix="/api")
+app.include_router(blog.router,       prefix="/api")
 
 # ── Static frontend ───────────────────────────────────────────────────────────
 
