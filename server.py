@@ -14,7 +14,7 @@ services and routers packages.
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -38,6 +38,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# StaticFiles sends only Last-Modified/ETag, so browsers apply heuristic
+# caching and can keep serving an old JS/CSS/HTML file after a deploy
+# without ever hitting the server to check. Force revalidation on every
+# request for the static frontend so edits always take effect on reload.
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 # ── API routers ───────────────────────────────────────────────────────────────
 
