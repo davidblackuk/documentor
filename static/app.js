@@ -291,9 +291,11 @@ class DashboardView {
     this._bus = bus;
 
     // DOM references
-    this._listEl          = document.getElementById("pdf-list");
-    this._completedSection= document.getElementById("completed-section");
-    this._completedListEl = document.getElementById("completed-list");
+    this._listEl           = document.getElementById("pdf-list");
+    this._inboxSection     = document.getElementById("inbox-section");
+    this._inboxListEl      = document.getElementById("inbox-list");
+    this._completedSection = document.getElementById("completed-section");
+    this._completedListEl  = document.getElementById("completed-list");
     this._statusLabel  = document.getElementById("model-status-label");
     this._btnLoad      = document.getElementById("btn-load-model");
     this._btnUnload    = document.getElementById("btn-unload-model");
@@ -392,11 +394,13 @@ class DashboardView {
   }
 
   /**
-   * Splits the filesystem's PDF list against the "completed" flag stored in
-   * preferences. A document marked completed whose PDF no longer exists in
-   * input/ has no PdfInfo from the server — it's synthesised here from the
-   * stem alone (stem == filename minus ".pdf", so the name is recoverable)
-   * with `missing: true` so the completed row can disable its actions.
+   * Splits the filesystem's PDF list three ways: Inbox (never scanned),
+   * In Progress (everything else not completed), and Completed, per the
+   * "completed" flag stored in preferences. A document marked completed
+   * whose PDF no longer exists in input/ has no PdfInfo from the server —
+   * it's synthesised here from the stem alone (stem == filename minus
+   * ".pdf", so the name is recoverable) with `missing: true` so the
+   * completed row can disable its actions.
    */
   _renderLists(pdfs, prefs) {
     const byStem = new Map(pdfs.map(p => [p.stem, p]));
@@ -404,26 +408,24 @@ class DashboardView {
     const completedStems = Object.keys(documents).filter(stem => documents[stem].completed);
     const completedSet = new Set(completedStems);
 
-    const active = pdfs.filter(p => !completedSet.has(p.stem));
-    const completed = completedStems
+    const notCompleted = pdfs.filter(p => !completedSet.has(p.stem));
+    const inbox      = notCompleted.filter(p => p.status === "pending");
+    const inProgress = notCompleted.filter(p => p.status !== "pending");
+    const completed  = completedStems
       .map(stem => byStem.get(stem) || {
         stem, filename: `${stem}.pdf`, status: "missing", page_count: null, missing: true,
       })
       .sort((a, b) => a.stem.localeCompare(b.stem));
 
-    this._renderActiveList(active, completed.length > 0);
+    this._renderInboxList(inbox);
+    this._renderInProgressList(inProgress, inbox.length > 0 || completed.length > 0);
     this._renderCompletedList(completed);
   }
 
-  _renderActiveList(pdfs, anyCompleted) {
-    if (!pdfs.length) {
-      this._listEl.innerHTML = anyCompleted
-        ? '<div class="loading-placeholder">All documents completed — see below.</div>'
-        : '<div class="loading-placeholder">No PDFs found in input/</div>';
-      return;
-    }
-
-    this._listEl.innerHTML = pdfs.map(p => `
+  /** Shared row markup for the Inbox and In Progress lists — both hold
+   *  live (non-completed) documents with identical actions available. */
+  _renderActiveRows(container, pdfs) {
+    container.innerHTML = pdfs.map(p => `
       <div class="pdf-row" data-stem="${p.stem}">
         <input class="pdf-checkbox" type="checkbox" data-stem="${p.stem}" />
         <span class="pdf-name" title="${p.filename}">${p.filename}</span>
@@ -440,18 +442,37 @@ class DashboardView {
       </div>
     `).join("");
 
-    this._listEl.querySelectorAll(".btn-open-editor").forEach(btn => {
+    container.querySelectorAll(".btn-open-editor").forEach(btn => {
       btn.addEventListener("click", () => this._bus.emit("open-editor", btn.dataset.stem));
     });
 
-    this._listEl.querySelectorAll(".btn-complete").forEach(btn => {
+    container.querySelectorAll(".btn-complete").forEach(btn => {
       btn.addEventListener("click", () => this._setCompleted(btn.dataset.stem, true));
     });
 
     // Checkbox → enable/disable "Scan Selected"
-    this._listEl.querySelectorAll(".pdf-checkbox").forEach(cb => {
+    container.querySelectorAll(".pdf-checkbox").forEach(cb => {
       cb.addEventListener("change", () => this._updateScanButton());
     });
+  }
+
+  _renderInProgressList(pdfs, anyElsewhere) {
+    if (!pdfs.length) {
+      this._listEl.innerHTML = anyElsewhere
+        ? '<div class="loading-placeholder">Nothing in progress — see below.</div>'
+        : '<div class="loading-placeholder">No PDFs found in input/</div>';
+      return;
+    }
+    this._renderActiveRows(this._listEl, pdfs);
+  }
+
+  _renderInboxList(items) {
+    this._inboxSection.classList.toggle("hidden", items.length === 0);
+    if (!items.length) {
+      this._inboxListEl.innerHTML = "";
+      return;
+    }
+    this._renderActiveRows(this._inboxListEl, items);
   }
 
   /** `missing` rows (completed, but the PDF is no longer in input/) render
@@ -501,14 +522,20 @@ class DashboardView {
     await this._refreshList();
   }
 
+  // "Scan Selected" pulls checked stems from both the Inbox and In Progress
+  // lists — rescanning an already-partial or -scanned document is as valid
+  // a use case as scanning a never-touched one.
+  _checkboxSelector() {
+    return "#pdf-list .pdf-checkbox:checked, #inbox-list .pdf-checkbox:checked";
+  }
+
   _updateScanButton() {
-    const anyChecked = !!this._listEl.querySelector(".pdf-checkbox:checked");
-    this._btnScan.disabled = !anyChecked;
+    this._btnScan.disabled = !document.querySelector(this._checkboxSelector());
   }
 
   _checkedStems() {
     return Array.from(
-      this._listEl.querySelectorAll(".pdf-checkbox:checked"),
+      document.querySelectorAll(this._checkboxSelector()),
       el => el.dataset.stem,
     );
   }

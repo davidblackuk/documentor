@@ -48,7 +48,7 @@
 
       <main class="dashboard-main">
         <div class="dashboard-toolbar">
-          <h2 class="section-title">Documents</h2>
+          <h2 class="section-title">In Progress</h2>
           <div class="toolbar-actions">
             <span id="save-point-status" class="save-status"></span>
             <button id="btn-save-point" class="btn btn-secondary"
@@ -65,14 +65,23 @@
           <div class="loading-placeholder">Loading…</div>
         </div>
 
+        <!-- Unscanned documents — hidden while empty. See
+             DashboardView._renderInboxList in app.js. -->
+        <div id="inbox-section" class="collapsible-section hidden">
+          <div class="dashboard-toolbar">
+            <h2 class="section-title">Inbox</h2>
+          </div>
+          <div id="inbox-list" class="pdf-list"></div>
+        </div>
+
         <!-- Completed documents — hidden while empty. Entries whose PDF has
              been removed from input/ stay listed with actions disabled;
              see DashboardView._renderCompletedList in app.js. -->
-        <div id="completed-section" class="completed-section hidden">
+        <div id="completed-section" class="collapsible-section hidden">
           <div class="dashboard-toolbar">
             <h2 class="section-title">Completed</h2>
           </div>
-          <div id="completed-list" class="pdf-list completed-list"></div>
+          <div id="completed-list" class="pdf-list"></div>
         </div>
 
         <!-- Scan progress panel — hidden until a scan starts -->

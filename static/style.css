@@ -290,26 +290,22 @@ html, body {
   pointer-events: none;
 }
 
-/* ── Dashboard: completed documents ──────────────────────────────────────── */
+/* ── Dashboard: Inbox / Completed sections ───────────────────────────────── */
 
-/* Shares the dashboard's vertical space evenly with .pdf-list — each list
-   gets about half and scrolls internally rather than overflowing off the
-   bottom of the window. Only applies while a completed document exists;
-   .hidden removes it entirely and .pdf-list reclaims the full height. */
-.completed-section {
+/* Used by #inbox-section and #completed-section. Each visible section
+   (including the always-shown #pdf-list above) shares the dashboard's
+   vertical space evenly via flex:1 on both the section and its .pdf-list,
+   and scrolls internally rather than overflowing off the window — two
+   sections split 50/50, three split into thirds. .hidden removes a section
+   entirely while it's empty, so the remaining ones reclaim its share. */
+.collapsible-section {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.completed-section.hidden { display: none; }
-
-.completed-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
+.collapsible-section.hidden { display: none; }
 
 /* ── Dashboard: scan progress ────────────────────────────────────────────── */
 
