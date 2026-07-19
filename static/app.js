@@ -20,6 +20,7 @@
 "use strict";
 
 import { initTheme } from "./theme.js";
+import { getPreferences, setPaneOrder, setDocumentPrefs } from "./preferences-api.js";
 
 /**
  * Distance from the top of `container`'s scrollable content to `el`, in the
@@ -1111,10 +1112,15 @@ class EditorView {
     this._savePageTimer  = null;
 
     // Pane order — a layout preference, not per-document, so it's loaded
-    // and applied once here rather than in open().
+    // and applied once here rather than in open().  Server prefs arrive
+    // asynchronously; open() awaits this._prefsPromise before it needs
+    // per-document data, and _loadPreferences() re-applies the pane order
+    // itself once it resolves — invisibly, since view-editor isn't shown yet.
     this._panesContainer = document.getElementById("editor-panes");
-    this._paneOrder = this._loadPaneOrder();
+    this._paneOrder = [...PANE_IDS];
     this._applyPaneOrder();
+    this._prefs = null;
+    this._prefsPromise = this._loadPreferences();
 
     this._wireToolbar();
     this._wirePaneMoveButtons();
@@ -1124,24 +1130,56 @@ class EditorView {
     window.addEventListener("documenter-theme-change", (e) => this._editorPane.setTheme(e.detail));
   }
 
-  // ── Per-document persistence (localStorage) ──────────────────────────────
+  // ── Preferences (server-side, replaces the old localStorage store) ───────
+
+  /** Fetches the whole preferences blob once and re-applies the pane order
+   *  if the server has a saved one different from the PANE_IDS default. */
+  async _loadPreferences() {
+    try {
+      this._prefs = await getPreferences();
+    } catch {
+      this._prefs = { theme: "dark", paneOrder: [...PANE_IDS], documents: {} };
+      return;
+    }
+    const stored = this._prefs.paneOrder;
+    if (Array.isArray(stored) &&
+        stored.length === PANE_IDS.length &&
+        PANE_IDS.every((id) => stored.includes(id))) {
+      this._paneOrder = stored;
+      this._applyPaneOrder();
+      this._updatePaneMoveButtons();
+    }
+  }
+
+  /** Merges `fields` into this document's stored prefs, both locally (so
+   *  immediate re-reads see the new value) and on the server. */
+  _setDocPref(stem, fields) {
+    if (!this._prefs) return;
+    Object.assign(this._prefs.documents[stem] ??= {}, fields);
+    setDocumentPrefs(stem, fields).catch(console.error);
+  }
+
+  // ── Per-document persistence ──────────────────────────────────────────────
 
   _saveLastPage(page) {
-    if (this._stem && page) localStorage.setItem(`documenter.page.${this._stem}`, page);
+    if (this._stem && page) this._setDocPref(this._stem, { page });
   }
 
   _loadLastPage(stem) {
-    return parseInt(localStorage.getItem(`documenter.page.${stem}`), 10) || 1;
+    return this._prefs?.documents?.[stem]?.page || 1;
   }
 
   _saveFontSizes(stem) {
-    localStorage.setItem(`documenter.editorFont.${stem}`, this._editorFontSelect.value);
-    localStorage.setItem(`documenter.previewFont.${stem}`, this._previewFontSelect.value);
+    this._setDocPref(stem, {
+      editorFont:  parseInt(this._editorFontSelect.value, 10),
+      previewFont: parseInt(this._previewFontSelect.value, 10),
+    });
   }
 
   _restoreFontSizes(stem) {
-    const edPx   = parseInt(localStorage.getItem(`documenter.editorFont.${stem}`),  10);
-    const prevPx = parseInt(localStorage.getItem(`documenter.previewFont.${stem}`), 10);
+    const doc    = this._prefs?.documents?.[stem] || {};
+    const edPx   = doc.editorFont;
+    const prevPx = doc.previewFont;
 
     if (edPx) {
       this._editorFontSelect.value = edPx;
@@ -1153,22 +1191,11 @@ class EditorView {
     }
   }
 
-  // ── Pane order (localStorage) ─────────────────────────────────────────────
-
-  _loadPaneOrder() {
-    try {
-      const stored = JSON.parse(localStorage.getItem("documenter.paneOrder"));
-      if (Array.isArray(stored) &&
-          stored.length === PANE_IDS.length &&
-          PANE_IDS.every((id) => stored.includes(id))) {
-        return stored;
-      }
-    } catch { /* malformed value — fall through to default */ }
-    return [...PANE_IDS];
-  }
+  // ── Pane order ─────────────────────────────────────────────────────────────
 
   _savePaneOrder() {
-    localStorage.setItem("documenter.paneOrder", JSON.stringify(this._paneOrder));
+    if (this._prefs) this._prefs.paneOrder = this._paneOrder;
+    setPaneOrder(this._paneOrder).catch(console.error);
   }
 
   _applyPaneOrder() {
@@ -1218,6 +1245,10 @@ class EditorView {
     this._stem  = stem;
 
     this._titleEl.textContent = `${stem}.pdf`;
+
+    // Per-document restoration below needs this._prefs; almost always
+    // already resolved by the time a user reaches the editor.
+    await this._prefsPromise;
 
     // ── Load markdown and PDF in parallel ─────────────────────────────────
     const [markdown] = await Promise.all([
@@ -1315,7 +1346,7 @@ class EditorView {
       this._previewPane.update(this._editorPane.getValue());
     });
 
-    // Persist the current page to localStorage 500 ms after scrolling stops.
+    // Persist the current page to the server 500 ms after scrolling stops.
     // The PDF pane is used as the single source of truth (sync scroll keeps
     // all three panes aligned, so any pane would give the same page number).
     this._pdfPane.onScroll(() => {

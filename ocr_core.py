@@ -36,6 +36,7 @@ BASE_DIR    = Path(__file__).parent
 INPUT_DIR   = BASE_DIR / "input"
 OUTPUT_DIR  = BASE_DIR / "output"
 PREVIEW_DIR = BASE_DIR / "preview"
+PREFS_PATH  = BASE_DIR / "preferences.json"
 
 # Hardcoded weights path — update DEEPSEEK_PATH here if you move the model.
 DEEPSEEK_PATH = Path(

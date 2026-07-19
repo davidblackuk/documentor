@@ -14,6 +14,9 @@ input/
 output/
 preview/
 
+# Per-machine UI preferences (theme, pane order, font sizes, last-read page)
+preferences.json
+
 # Python cache
 __pycache__/
 *.py[cod]

@@ -14,13 +14,12 @@ services and routers packages.
 
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import ocr_core
-from routers import backup, blog, formatting, model, pdfs, scanner
+from routers import backup, blog, formatting, model, pdfs, preferences, scanner
 
 # ── Application ───────────────────────────────────────────────────────────────
 
@@ -40,43 +39,15 @@ app.add_middleware(
 )
 
 
-# "localhost" and "127.0.0.1" are different origins to the browser, so
-# per-document localStorage (font sizes, edit positions) silently forks
-# depending on which hostname was used. Canonicalize on 127.0.0.1, which
-# is what start.sh binds and prints, so localStorage stays under one origin.
-#
-# /api/* is excluded: redirecting an in-page fetch() cross-origin requires
-# CORS headers on the final response, which we don't send for localhost,
-# so the browser blocks it. The API behaves identically on either
-# hostname, so there's nothing to gain by redirecting it anyway — only
-# the document/static routes need to converge for localStorage's sake.
-@app.middleware("http")
-async def canonicalize_host(request: Request, call_next):
-    host = request.headers.get("host", "")
-    is_localhost = host.startswith("localhost:") or host == "localhost"
-    is_api = request.url.path.startswith("/api/")
-    if is_localhost and not is_api:
-        new_host = host.replace("localhost", "127.0.0.1", 1)
-        url = request.url.replace(netloc=new_host)
-        return RedirectResponse(url=str(url), status_code=307)
-    response = await call_next(request)
-    if not is_api:
-        # StaticFiles sends only Last-Modified/ETag, so browsers apply
-        # heuristic caching and can serve a stale localhost:8000 document
-        # straight from disk cache without ever hitting the server again
-        # — which would silently skip the redirect above. Force
-        # revalidation on every navigation so that can't happen.
-        response.headers["Cache-Control"] = "no-cache"
-    return response
-
 # ── API routers ───────────────────────────────────────────────────────────────
 
-app.include_router(pdfs.router,       prefix="/api")
-app.include_router(scanner.router,    prefix="/api")
-app.include_router(model.router,      prefix="/api")
-app.include_router(formatting.router, prefix="/api")
-app.include_router(backup.router,     prefix="/api")
-app.include_router(blog.router,       prefix="/api")
+app.include_router(pdfs.router,        prefix="/api")
+app.include_router(scanner.router,     prefix="/api")
+app.include_router(model.router,       prefix="/api")
+app.include_router(formatting.router,  prefix="/api")
+app.include_router(backup.router,      prefix="/api")
+app.include_router(blog.router,        prefix="/api")
+app.include_router(preferences.router, prefix="/api")
 
 # ── Static frontend ───────────────────────────────────────────────────────────
 
