@@ -26,6 +26,7 @@ class DocumentPrefsBody(BaseModel):
     page: int | None = None
     editorFont: int | None = None
     previewFont: int | None = None
+    completed: bool | None = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -51,5 +52,9 @@ def put_document_prefs(
     stem: str, body: DocumentPrefsBody, svc: PreferencesService = Depends(get_preferences_service)
 ):
     return svc.update_document(
-        stem, page=body.page, editor_font=body.editorFont, preview_font=body.previewFont
+        stem,
+        page=body.page,
+        editor_font=body.editorFont,
+        preview_font=body.previewFont,
+        completed=body.completed,
     )

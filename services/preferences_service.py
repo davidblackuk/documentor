@@ -67,9 +67,16 @@ class PreferencesService:
         page: int | None = None,
         editor_font: int | None = None,
         preview_font: int | None = None,
+        completed: bool | None = None,
     ) -> dict:
         """Merge the given fields into this document's stored preferences.
-        Fields left as None are untouched."""
+        Fields left as None are untouched.
+
+        `completed` is kept here rather than input/ or output/ because it
+        must survive the PDF being deleted from the filesystem — the
+        dashboard's Completed section still lists it (with actions
+        disabled) until the entry is explicitly removed.
+        """
         with self._lock:
             data = self._load()
             doc = data["documents"].setdefault(stem, {})
@@ -79,6 +86,8 @@ class PreferencesService:
                 doc["editorFont"] = editor_font
             if preview_font is not None:
                 doc["previewFont"] = preview_font
+            if completed is not None:
+                doc["completed"] = completed
             self._save(data)
             return data
 

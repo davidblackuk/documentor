@@ -291,7 +291,9 @@ class DashboardView {
     this._bus = bus;
 
     // DOM references
-    this._listEl       = document.getElementById("pdf-list");
+    this._listEl          = document.getElementById("pdf-list");
+    this._completedSection= document.getElementById("completed-section");
+    this._completedListEl = document.getElementById("completed-list");
     this._statusLabel  = document.getElementById("model-status-label");
     this._btnLoad      = document.getElementById("btn-load-model");
     this._btnUnload    = document.getElementById("btn-unload-model");
@@ -382,17 +384,42 @@ class DashboardView {
   async _refreshList() {
     this._listEl.innerHTML = '<div class="loading-placeholder">Loading…</div>';
     try {
-      const pdfs = await Api.listPdfs();
-      this._renderList(pdfs);
+      const [pdfs, prefs] = await Promise.all([Api.listPdfs(), getPreferences()]);
+      this._renderLists(pdfs, prefs);
     } catch {
       this._listEl.innerHTML = '<div class="loading-placeholder">Failed to load PDF list.</div>';
     }
   }
 
-  _renderList(pdfs) {
+  /**
+   * Splits the filesystem's PDF list against the "completed" flag stored in
+   * preferences. A document marked completed whose PDF no longer exists in
+   * input/ has no PdfInfo from the server — it's synthesised here from the
+   * stem alone (stem == filename minus ".pdf", so the name is recoverable)
+   * with `missing: true` so the completed row can disable its actions.
+   */
+  _renderLists(pdfs, prefs) {
+    const byStem = new Map(pdfs.map(p => [p.stem, p]));
+    const documents = prefs.documents || {};
+    const completedStems = Object.keys(documents).filter(stem => documents[stem].completed);
+    const completedSet = new Set(completedStems);
+
+    const active = pdfs.filter(p => !completedSet.has(p.stem));
+    const completed = completedStems
+      .map(stem => byStem.get(stem) || {
+        stem, filename: `${stem}.pdf`, status: "missing", page_count: null, missing: true,
+      })
+      .sort((a, b) => a.stem.localeCompare(b.stem));
+
+    this._renderActiveList(active, completed.length > 0);
+    this._renderCompletedList(completed);
+  }
+
+  _renderActiveList(pdfs, anyCompleted) {
     if (!pdfs.length) {
-      this._listEl.innerHTML =
-        '<div class="loading-placeholder">No PDFs found in input/</div>';
+      this._listEl.innerHTML = anyCompleted
+        ? '<div class="loading-placeholder">All documents completed — see below.</div>'
+        : '<div class="loading-placeholder">No PDFs found in input/</div>';
       return;
     }
 
@@ -407,22 +434,71 @@ class DashboardView {
              href="/pdf-view.html?stem=${encodeURIComponent(p.stem)}">PDF</a>
           <a class="btn btn-secondary btn-edit${p.status === "scanned" ? "" : " btn-invisible"}"
              href="/preview.html?stem=${encodeURIComponent(p.stem)}">Markdown</a>
-          <button class="btn btn-secondary btn-edit" data-stem="${p.stem}">Edit</button>
+          <button class="btn btn-secondary btn-edit btn-open-editor" data-stem="${p.stem}">Edit</button>
+          <button class="btn btn-secondary btn-edit btn-complete" data-stem="${p.stem}">Complete</button>
         </div>
       </div>
     `).join("");
 
-    // Edit buttons
-    this._listEl.querySelectorAll(".btn-edit").forEach(btn => {
-      btn.addEventListener("click", () => {
-        this._bus.emit("open-editor", btn.dataset.stem);
-      });
+    this._listEl.querySelectorAll(".btn-open-editor").forEach(btn => {
+      btn.addEventListener("click", () => this._bus.emit("open-editor", btn.dataset.stem));
+    });
+
+    this._listEl.querySelectorAll(".btn-complete").forEach(btn => {
+      btn.addEventListener("click", () => this._setCompleted(btn.dataset.stem, true));
     });
 
     // Checkbox → enable/disable "Scan Selected"
     this._listEl.querySelectorAll(".pdf-checkbox").forEach(cb => {
       cb.addEventListener("change", () => this._updateScanButton());
     });
+  }
+
+  /** `missing` rows (completed, but the PDF is no longer in input/) render
+   *  every action disabled instead of wired up, per the on-disk check above. */
+  _renderCompletedList(items) {
+    this._completedSection.classList.toggle("hidden", items.length === 0);
+    if (!items.length) {
+      this._completedListEl.innerHTML = "";
+      return;
+    }
+
+    this._completedListEl.innerHTML = items.map(p => {
+      const off = p.missing ? " btn-disabled" : "";
+      return `
+        <div class="pdf-row" data-stem="${p.stem}">
+          <span class="pdf-name" title="${p.filename}">${p.filename}</span>
+          <span class="pdf-pages">${p.page_count != null ? `${p.page_count} pp` : "—"}</span>
+          <span class="status-badge status-${p.status}">${p.status}</span>
+          <div class="pdf-actions">
+            <a class="btn btn-secondary btn-edit${off}"
+               href="/pdf-view.html?stem=${encodeURIComponent(p.stem)}">PDF</a>
+            <a class="btn btn-secondary btn-edit${p.status === "scanned" ? "" : " btn-invisible"}${off}"
+               href="/preview.html?stem=${encodeURIComponent(p.stem)}">Markdown</a>
+            <button class="btn btn-secondary btn-edit btn-open-editor" data-stem="${p.stem}" ${p.missing ? "disabled" : ""}>Edit</button>
+            <button class="btn btn-secondary btn-edit btn-reopen" data-stem="${p.stem}" ${p.missing ? "disabled" : ""}>Reopen</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    this._completedListEl.querySelectorAll(".btn-open-editor").forEach(btn => {
+      btn.addEventListener("click", () => this._bus.emit("open-editor", btn.dataset.stem));
+    });
+
+    this._completedListEl.querySelectorAll(".btn-reopen").forEach(btn => {
+      btn.addEventListener("click", () => this._setCompleted(btn.dataset.stem, false));
+    });
+  }
+
+  async _setCompleted(stem, completed) {
+    try {
+      await setDocumentPrefs(stem, { completed });
+    } catch (err) {
+      console.error(err);
+      return;
+    }
+    await this._refreshList();
   }
 
   _updateScanButton() {

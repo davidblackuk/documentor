@@ -65,6 +65,16 @@
           <div class="loading-placeholder">Loading…</div>
         </div>
 
+        <!-- Completed documents — hidden while empty. Entries whose PDF has
+             been removed from input/ stay listed with actions disabled;
+             see DashboardView._renderCompletedList in app.js. -->
+        <div id="completed-section" class="completed-section hidden">
+          <div class="dashboard-toolbar">
+            <h2 class="section-title">Completed</h2>
+          </div>
+          <div id="completed-list" class="pdf-list completed-list"></div>
+        </div>
+
         <!-- Scan progress panel — hidden until a scan starts -->
         <div id="scan-progress-panel" class="scan-progress-panel hidden">
           <div class="progress-header">

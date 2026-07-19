@@ -207,6 +207,7 @@ html, body {
 
 .pdf-list {
   flex: 1;
+  min-height: 0;   /* let it shrink below content height so overflow-y can scroll */
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -258,12 +259,13 @@ html, body {
 .status-partial   { background: rgba(220,220,170,0.15); color: var(--warning); }
 .status-cancelled { background: rgba(244,71,71,0.15);   color: var(--danger); }
 .status-pending   { background: rgba(100,100,100,0.15); color: var(--text-dim); }
+.status-missing   { background: rgba(100,100,100,0.15); color: var(--text-dim); }
 
 .pdf-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  width: 210px;
+  width: 260px;
   flex-shrink: 0;
 }
 
@@ -278,6 +280,35 @@ html, body {
 .btn-invisible {
   visibility: hidden;
   pointer-events: none;
+}
+
+/* Anchors don't support :disabled, so rows for a completed-but-missing
+   document (see DashboardView._renderCompletedList) use this instead. */
+.btn-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Dashboard: completed documents ──────────────────────────────────────── */
+
+/* Shares the dashboard's vertical space evenly with .pdf-list — each list
+   gets about half and scrolls internally rather than overflowing off the
+   bottom of the window. Only applies while a completed document exists;
+   .hidden removes it entirely and .pdf-list reclaims the full height. */
+.completed-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.completed-section.hidden { display: none; }
+
+.completed-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* ── Dashboard: scan progress ────────────────────────────────────────────── */
