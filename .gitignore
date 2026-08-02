@@ -21,3 +21,6 @@ preferences.json
 __pycache__/
 *.py[cod]
 *.pyo
+
+# Server output when launched detached (nohup)
+server.log

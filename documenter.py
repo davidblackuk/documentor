@@ -31,7 +31,7 @@ from ocr_core import (  # noqa: F401
 console = Console()
 
 MODELS = {
-    "deepseek": {"name": "DeepSeek-OCR", "installed": DEEPSEEK_PATH.exists()},
+    "deepseek": {"name": "DeepSeek-OCR-2", "installed": DEEPSEEK_PATH.exists()},
     "marker":   {"name": "Marker",        "installed": False},
 }
 try:

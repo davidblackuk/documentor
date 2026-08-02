@@ -32,7 +32,7 @@ class ModelService:
     loop free while transformers does its multi-second initialisation.
     """
 
-    _MODEL_NAME = "DeepSeek-OCR"
+    _MODEL_NAME = "DeepSeek-OCR-2"
 
     def get_status(self) -> ModelStatus:
         """Return the current model state without any side effects."""

@@ -34,7 +34,7 @@ preview/    ← temporary output from Test Scan (page-range previews)
 
 **`documenter.py`** is the main entrypoint. Key sections:
 
-- `DEEPSEEK_PATH` — hardcoded path to the model weights (`~/Documents/AI/ComfyUI/models/deepseek-ocr/deepseek-ai_DeepSeek-OCR`). Must exist for DeepSeek to load.
+- `DEEPSEEK_PATH` — hardcoded path to the model weights (`~/Documents/AI/ComfyUI/models/deepseek-ocr2/deepseek-ai_DeepSeek-OCR-2`). Must exist for DeepSeek to load.
 - `load_model()` / `unload_model()` — lazy singleton; model stays in GPU VRAM until explicitly unloaded or the process exits.
 - `ocr_page()` — calls `_model.infer(...)` with `crop_mode=True`, reads `result.mmd` from the temp output dir, rewrites embedded image refs to the shared `images/` folder, strips DeepSeek layout tags (`<|ref|>`, `<|det|>`).
 - `process_pdf()` — renders all selected pages to PNGs in a `tempfile.TemporaryDirectory`, then OCRs them sequentially with a Rich progress bar.
@@ -44,10 +44,11 @@ preview/    ← temporary output from Test Scan (page-range previews)
 
 ## Model details
 
-- **DeepSeek-OCR** loaded via `transformers.AutoModel` with `trust_remote_code=True`, `bfloat16`, CUDA. Uses `_attn_implementation="eager"` to avoid flash-attention issues.
-- `model.infer(...)` is the model's custom method (not a standard HF API). Parameters `base_size=1024`, `image_size=640`, `crop_mode=True` are load-bearing — changing them affects crop tiling and output quality.
+- **DeepSeek-OCR-2** loaded via `transformers.AutoModel` with `trust_remote_code=True`, `bfloat16`, CUDA. Uses `_attn_implementation="eager"` to avoid flash-attention issues (the model card's example uses `flash_attention_2`, but the vision encoder rejects that implementation anyway and `eager` works fine without installing `flash-attn`).
+- `model.infer(...)` is the model's custom method (not a standard HF API). Parameters `base_size=1024`, `image_size=768`, `crop_mode=True` are load-bearing — changing them affects crop tiling and output quality. `image_size=768` is OCR-2's tuned tile resolution (v1 used 640).
 - Output file is `result.mmd` in the temp directory passed as `output_path`.
 - `MODELS["marker"]` stub exists for future integration but is not implemented.
+- Figure extraction only happens as a side effect of a grounding-mode pass (Free OCR mode doesn't detect image regions). `ocr_core._page_has_diagram()` uses connected-component analysis (`scipy.ndimage.label`) on the rendered page pixels to catch diagram-bearing pages that would otherwise OCR cleanly with Free OCR and never trigger a fallback — see that function's docstring for why PDF-level image metadata (`fitz.Page.get_images()`) doesn't work for this (these source PDFs are scan-per-page, so every page reports one full-page image regardless of content). `scipy` is an added dependency for this.
 
 ## Git conventions
 
