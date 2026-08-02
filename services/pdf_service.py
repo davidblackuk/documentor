@@ -221,8 +221,16 @@ class PdfService:
             rf".*?"                           # existing content (non-greedy)
             rf"(?=<!-- page \d+ -->|$)"       # stop at next marker or EOF
         )
-        replacement = rf"\1\n\n{re.escape(new_text)}\n\n"
-        updated = re.sub(pattern, replacement, content, count=1, flags=re.DOTALL)
+        # A replacement function (not a string) sidesteps re.sub's backslash
+        # escape processing (\1, \g<name>, ...) entirely, so new_text is
+        # inserted verbatim regardless of what characters it contains.
+        updated = re.sub(
+            pattern,
+            lambda m: f"{m.group(1)}\n\n{new_text}\n\n",
+            content,
+            count=1,
+            flags=re.DOTALL,
+        )
 
         # If the regex matched nothing the marker was missing.  Insert the page
         # at the correct sorted position: just before the first marker whose
