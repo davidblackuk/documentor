@@ -1709,20 +1709,34 @@ class EditorView {
 
     // Ctrl+Shift+C / Cmd+Shift+C — wrap selection as C.
     // Ctrl+Shift+B / Cmd+Shift+B — wrap selection as BASIC.
+    // Ctrl+Shift+Z / Cmd+Shift+Z — wrap selection as Z80 Assembly.
+    // Ctrl+Shift+3 / Cmd+Shift+3 — wrap selection as C#.
     // Note: Ctrl+Shift+C is also Chrome DevTools' inspect-element shortcut;
     // since that's a browser-level binding, it may win over this handler
-    // depending on browser/OS.
+    // depending on browser/OS. Digit3 is matched via e.code rather than
+    // e.key since Shift+3 produces a different character ("#" on US
+    // layouts) than the bare digit.
+    //
+    // Registered on the capture phase (and stopped there) because Monaco
+    // binds Ctrl+Shift+Z to its own Redo command on the editor's DOM node;
+    // a bubble-phase document listener never sees the keystroke since
+    // Monaco's own handler (at the event target) consumes it first.
+    // Capturing on document fires before that, so stopPropagation here
+    // keeps Monaco's default binding from also firing.
     document.addEventListener("keydown", (e) => {
       if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
       const key = e.key.toLowerCase();
-      if (key === "c") {
-        e.preventDefault();
-        this._onCodeShortcut("c");
-      } else if (key === "b") {
-        e.preventDefault();
-        this._onCodeShortcut("basic");
-      }
-    });
+      let language = null;
+      if (key === "c") language = "c";
+      else if (key === "b") language = "basic";
+      else if (key === "z") language = "z80";
+      else if (e.code === "Digit3") language = "csharp";
+
+      if (!language) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this._onCodeShortcut(language);
+    }, true);
   }
 
   // ── Crop-to-image ────────────────────────────────────────────────────────
