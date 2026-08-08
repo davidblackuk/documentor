@@ -215,6 +215,7 @@
               <button class="btn-pane-move" data-pane="pane-pdf" data-move="right" title="Move pane right">›</button>
             </div>
             <div class="pdf-indicators">
+              <button id="btn-crop" class="btn btn-secondary" title="Drag a rectangle on the PDF to save it as an image">⬚ Crop</button>
               <span id="pdf-page-indicator" class="pdf-page-indicator"></span>
               <span id="pdf-scroll-percent" class="pdf-scroll-percent"></span>
             </div>
@@ -241,6 +242,9 @@
           </div>
         </div>
       </div>
+
+      <!-- Toast — brief confirmation/error messages, e.g. after a crop-to-image save -->
+      <div id="toast" class="toast"></div>
     </div>
   </div>
 

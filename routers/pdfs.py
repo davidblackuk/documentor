@@ -22,6 +22,14 @@ class MarkdownBody(BaseModel):
     content: str
 
 
+class CropBody(BaseModel):
+    page: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/pdfs")
@@ -111,3 +119,21 @@ def get_image(stem: str, filename: str, svc: PdfService = Depends(get_pdf_servic
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Image '{filename}' not found")
     return FileResponse(str(path))
+
+
+@router.post("/pdf/{stem}/crop-image")
+def crop_image(
+    stem: str,
+    body: CropBody,
+    svc: PdfService = Depends(get_pdf_service),
+):
+    """
+    Render a dragged rectangle from the PDF pane to a JPEG in images/ and
+    return its filename plus a ready-to-paste markdown image link.
+    """
+    try:
+        return svc.save_cropped_image(
+            stem, body.page, (body.x0, body.y0, body.x1, body.y1)
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

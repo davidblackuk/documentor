@@ -40,6 +40,18 @@ function offsetTopWithin(el, container) {
     + container.scrollTop;
 }
 
+/** Transient bottom-of-screen notification. Reuses a single #toast element. */
+let _toastTimer = null;
+function showToast(message, { error = false } = {}) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  clearTimeout(_toastTimer);
+  el.textContent = message;
+  el.classList.toggle("error", error);
+  el.classList.add("visible");
+  _toastTimer = setTimeout(() => el.classList.remove("visible"), 2500);
+}
+
 // ============================================================================
 // SECTION 1: API CLIENT
 // All server communication in one place. Routes are string constants to avoid
@@ -70,6 +82,24 @@ class Api {
   static async getPageCount(stem) {
     const data = await Api._get(`/api/pdf/${encodeURIComponent(stem)}/page-count`);
     return data.count;
+  }
+
+  /**
+   * Crop a rectangle (PDF point space) out of one page and save it as an
+   * image. Returns { filename, markdown }. Throws with the server's detail
+   * message on failure (e.g. an out-of-range page or zero-area rect).
+   */
+  static async cropImage(stem, page, rect) {
+    const r = await fetch(`/api/pdf/${encodeURIComponent(stem)}/crop-image`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ page, ...rect }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => null);
+      throw new Error(body?.detail || `Crop failed: ${r.status}`);
+    }
+    return r.json();
   }
 
   // ── Blog publishing ───────────────────────────────────────────────────────
@@ -646,6 +676,13 @@ class PdfViewerPane {
     this._pageCount  = 0;
     this._rendered   = new Set(); // page numbers already drawn
     this._observer   = null;      // IntersectionObserver for lazy rendering
+
+    // Crop-to-image drag selection.
+    this._pageSizes      = new Map(); // page number -> { width, height } in PDF points
+    this._cropMode        = false;
+    this._onCropComplete  = null;     // (pageNum, {x0,y0,x1,y1}) => void
+    this._cropDrag         = null;    // in-progress drag state, or null
+    this._wireCropHandlers();
   }
 
   // ── Loading ───────────────────────────────────────────────────────────────
@@ -717,6 +754,15 @@ class PdfViewerPane {
     // Scale to fill the pane width at ~1.5× viewport ratio for readability.
     const viewport = page.getViewport({ scale: 1.5 });
 
+    // Stash the page's native point-space size (scale 1) so crop drags —
+    // measured against the wrapper's on-screen CSS size — can be converted
+    // to PDF points without depending on the 1.5x render scale or on
+    // whatever size the browser actually displays the canvas at.
+    this._pageSizes.set(pageNum, {
+      width:  viewport.width / 1.5,
+      height: viewport.height / 1.5,
+    });
+
     const canvas  = document.createElement("canvas");
     canvas.width  = viewport.width;
     canvas.height = viewport.height;
@@ -786,6 +832,122 @@ class PdfViewerPane {
       }
     }
     return closest;
+  }
+
+  // ── Crop-to-image ────────────────────────────────────────────────────────
+
+  /** Register the callback fired after a drag completes: (pageNum, rect) => void. */
+  setOnCropComplete(fn) {
+    this._onCropComplete = fn;
+  }
+
+  isCropMode() {
+    return this._cropMode;
+  }
+
+  enableCropMode() {
+    this._cropMode = true;
+    this._container.classList.add("crop-armed");
+  }
+
+  disableCropMode() {
+    this._cropMode = false;
+    this._container.classList.remove("crop-armed");
+    this._cancelDrag();
+  }
+
+  _cancelDrag() {
+    if (this._cropDrag?.box) this._cropDrag.box.remove();
+    this._cropDrag = null;
+  }
+
+  getPageSize(pageNum) {
+    return this._pageSizes.get(pageNum) ?? null;
+  }
+
+  /** Wire mousedown/mousemove/mouseup once, delegated on the scroll container. */
+  _wireCropHandlers() {
+    this._container.addEventListener("mousedown", (e) => this._onCropMouseDown(e));
+    this._container.addEventListener("mousemove", (e) => this._onCropMouseMove(e));
+    window.addEventListener("mouseup", (e) => this._onCropMouseUp(e));
+  }
+
+  _onCropMouseDown(e) {
+    if (!this._cropMode) return;
+    const wrapper = e.target.closest(".pdf-page-wrapper");
+    if (!wrapper) return;
+
+    e.preventDefault();
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const box = document.createElement("div");
+    box.className = "crop-selection-box";
+    wrapper.appendChild(box);
+
+    this._cropDrag = {
+      page: parseInt(wrapper.dataset.page, 10),
+      wrapper,
+      wrapperRect,
+      startX: e.clientX,
+      startY: e.clientY,
+      box,
+    };
+    this._positionSelectionBox(e.clientX, e.clientY);
+  }
+
+  _onCropMouseMove(e) {
+    if (!this._cropDrag) return;
+    e.preventDefault();
+    this._positionSelectionBox(e.clientX, e.clientY);
+  }
+
+  _positionSelectionBox(clientX, clientY) {
+    const d = this._cropDrag;
+    const r = d.wrapperRect;
+
+    const x1 = Math.min(Math.max(clientX, r.left), r.right);
+    const y1 = Math.min(Math.max(clientY, r.top),  r.bottom);
+    const x0 = Math.min(d.startX, x1);
+    const y0 = Math.min(d.startY, y1);
+    const x1c = Math.max(d.startX, x1);
+    const y1c = Math.max(d.startY, y1);
+
+    d.box.style.left   = `${x0 - r.left}px`;
+    d.box.style.top    = `${y0 - r.top}px`;
+    d.box.style.width  = `${x1c - x0}px`;
+    d.box.style.height = `${y1c - y0}px`;
+  }
+
+  async _onCropMouseUp(e) {
+    const d = this._cropDrag;
+    if (!d) return;
+    this._cropDrag = null;
+    d.box.remove();
+
+    const r = d.wrapperRect;
+    const x1 = Math.min(Math.max(e.clientX, r.left), r.right);
+    const y1 = Math.min(Math.max(e.clientY, r.top),  r.bottom);
+    const left   = Math.min(d.startX, x1) - r.left;
+    const top    = Math.min(d.startY, y1) - r.top;
+    const width  = Math.abs(x1 - d.startX);
+    const height = Math.abs(y1 - d.startY);
+
+    // Ignore accidental clicks/tiny drags.
+    if (width < 6 || height < 6) return;
+
+    const pageSize = this.getPageSize(d.page);
+    if (!pageSize) return;
+
+    const fx0 = left / r.width,            fy0 = top / r.height;
+    const fx1 = (left + width) / r.width,  fy1 = (top + height) / r.height;
+
+    const rect = {
+      x0: fx0 * pageSize.width,
+      y0: fy0 * pageSize.height,
+      x1: fx1 * pageSize.width,
+      y1: fy1 * pageSize.height,
+    };
+
+    if (this._onCropComplete) this._onCropComplete(d.page, rect);
   }
 }
 
@@ -1184,6 +1346,7 @@ class EditorView {
     this._publishStatusEl = document.getElementById("publish-status");
     this._btnRescan    = document.getElementById("btn-rescan-page");
     this._btnCodeBlock = document.getElementById("btn-code-block");
+    this._btnCrop      = document.getElementById("btn-crop");
     this._codeLangMenu = document.getElementById("code-lang-menu");
     this._syncToggle        = document.getElementById("toggle-sync-scroll");
     this._editorFontSelect  = document.getElementById("editor-font-size");
@@ -1206,6 +1369,7 @@ class EditorView {
     this._editorPane  = new MarkdownEditorPane(this._monacoContainer);
     this._previewPane = new PreviewPane(this._previewBody);
     this._pdfPane     = new PdfViewerPane(this._pdfBody, this._pdfIndicator, this._pdfPercent);
+    this._pdfPane.setOnCropComplete((page, rect) => this._onCropComplete(page, rect));
     this._scroller    = null;   // created after Monaco is ready
 
     this._dirty          = false;
@@ -1507,6 +1671,11 @@ class EditorView {
 
     this._btnRescan.addEventListener("click", () => this._rescanCurrentPage());
 
+    this._btnCrop.addEventListener("click", () => this._toggleCropMode());
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && this._pdfPane.isCropMode()) this._toggleCropMode(false);
+    });
+
     this._btnCodeBlock.addEventListener("click", () => this._onCodeBlockClick());
     this._codeLangMenu.querySelectorAll(".code-lang-option").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -1554,6 +1723,31 @@ class EditorView {
         this._onCodeShortcut("basic");
       }
     });
+  }
+
+  // ── Crop-to-image ────────────────────────────────────────────────────────
+
+  /** Toggle crop-drag mode on the PDF pane; pass an explicit bool to force a state. */
+  _toggleCropMode(force) {
+    const enable = force ?? !this._pdfPane.isCropMode();
+    if (enable) {
+      this._pdfPane.enableCropMode();
+    } else {
+      this._pdfPane.disableCropMode();
+    }
+    this._btnCrop.classList.toggle("active", enable);
+  }
+
+  /** Fired by PdfViewerPane after a drag completes with a large-enough rectangle. */
+  async _onCropComplete(page, rect) {
+    if (!this._stem) return;
+    try {
+      const { markdown } = await Api.cropImage(this._stem, page, rect);
+      await navigator.clipboard.writeText(markdown);
+      showToast("Image saved — link copied to clipboard");
+    } catch (err) {
+      showToast(err.message || "Crop failed", { error: true });
+    }
   }
 
   /** Returns true on success, false on failure — callers that gate further

@@ -300,6 +300,59 @@ class PdfService:
         doc.close()
         return count
 
+    # ── Crop-to-image ─────────────────────────────────────────────────────────
+
+    def save_cropped_image(
+        self, stem: str, page_num: int, rect: tuple[float, float, float, float]
+    ) -> dict:
+        """
+        Render a rectangular region of one PDF page to a JPEG in images/ and
+        return its filename plus a ready-to-paste markdown image link.
+
+        `rect` is (x0, y0, x1, y1) in PDF point space (top-left origin,
+        y-down) — the same coordinate system PyMuPDF and PDF.js both use, so
+        the caller (the web editor) converts screen-pixel drag coordinates to
+        points itself and this method just clips and rasterises.
+
+        Filenames use a `p{page:04d}_crop{n:04d}.jpg` scheme, distinct from
+        the OCR pipeline's own `p{page:04d}_{index:04d}.jpg` figures (see
+        ocr_core._ocr_page). That counter resets to 0 on every scan/rescan,
+        so sharing the namespace would let a single-page rescan silently
+        overwrite a hand-cropped image with the same name.
+        """
+        x0, y0, x1, y1 = rect
+        if x1 <= x0 or y1 <= y0:
+            raise ValueError("Crop rectangle must have positive width and height")
+
+        doc = fitz.open(str(self.get_pdf_path(stem)))
+        try:
+            if not (1 <= page_num <= len(doc)):
+                raise ValueError(f"Page {page_num} out of range (1-{len(doc)})")
+
+            page = doc[page_num - 1]
+            mat  = fitz.Matrix(300 / 72, 300 / 72)   # 300 DPI, matches the scan pipeline
+            pix  = page.get_pixmap(matrix=mat, clip=fitz.Rect(x0, y0, x1, y1))
+
+            imgs_dir = self.get_output_dir(stem) / "images"
+            imgs_dir.mkdir(parents=True, exist_ok=True)
+
+            existing = imgs_dir.glob(f"p{page_num:04d}_crop*.jpg")
+            used = set()
+            for f in existing:
+                m = re.match(rf"p{page_num:04d}_crop(\d+)\.jpg$", f.name)
+                if m:
+                    used.add(int(m.group(1)))
+            n = 0
+            while n in used:
+                n += 1
+
+            filename = f"p{page_num:04d}_crop{n:04d}.jpg"
+            pix.save(str(imgs_dir / filename))
+        finally:
+            doc.close()
+
+        return {"filename": filename, "markdown": f"![]({'images/' + filename})"}
+
 
 # ── Dependency factory ────────────────────────────────────────────────────────
 
