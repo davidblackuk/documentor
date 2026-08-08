@@ -1711,6 +1711,7 @@ class EditorView {
     // Ctrl+Shift+B / Cmd+Shift+B — wrap selection as BASIC.
     // Ctrl+Shift+Z / Cmd+Shift+Z — wrap selection as Z80 Assembly.
     // Ctrl+Shift+3 / Cmd+Shift+3 — wrap selection as C#.
+    // Ctrl+Shift+M / Cmd+Shift+M — wrap selection as MC68000 Assembly.
     // Note: Ctrl+Shift+C is also Chrome DevTools' inspect-element shortcut;
     // since that's a browser-level binding, it may win over this handler
     // depending on browser/OS. Digit3 is matched via e.code rather than
@@ -1730,6 +1731,7 @@ class EditorView {
       if (key === "c") language = "c";
       else if (key === "b") language = "basic";
       else if (key === "z") language = "z80";
+      else if (key === "m") language = "m68k";
       else if (e.code === "Digit3") language = "csharp";
 
       if (!language) return;
